@@ -1,0 +1,504 @@
+import { useState } from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from 'recharts';
+import { TrendingUp, TrendingDown, Play, Image, Sparkles } from 'lucide-react';
+import { InfoTooltip } from '../common/InfoTooltip';
+import type { ProfileInsight, DailyProfileData } from '../../types';
+
+interface ProfileTabProps {
+  profileData: ProfileInsight | null;
+  dailyData: DailyProfileData[] | null;
+  loading: boolean;
+}
+
+const formatNumber = (num: number): string => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toLocaleString();
+};
+
+// 스토리 성과 더미 데이터
+const storyPerformanceData = [
+  { date: '2024-12-14', stories: 5, views: 8234, linkClicks: 342 },
+  { date: '2024-12-13', stories: 3, views: 6890, linkClicks: 289 },
+  { date: '2024-12-12', stories: 4, views: 7456, linkClicks: 312 },
+  { date: '2024-12-11', stories: 6, views: 9123, linkClicks: 398 },
+  { date: '2024-12-10', stories: 4, views: 7234, linkClicks: 276 },
+];
+
+const storyStats = {
+  avgViews: 7787,
+  reach: 6234,
+  linkClicks: 1617,
+};
+
+// 프로필 AI 분석 데이터
+const profileAIAnalysis = {
+  summary: '프로필 성장세가 전월 대비 18% 상승하며 꾸준한 팔로워 증가를 보이고 있습니다. 특히 릴스 콘텐츠의 도달률이 피드 대비 2.8배 높게 나타나고 있습니다.',
+  insights: [
+    '오후 6-9시 게시물의 참여율이 평균 대비 42% 높습니다.',
+    '릴스 콘텐츠가 피드 대비 2.8배 높은 도달률을 기록 중입니다.',
+    '스토리 링크 클릭률이 업계 평균(2.1%) 대비 1.5배 높습니다.',
+    '25-34세 여성 타겟층에서 가장 높은 참여율이 발생했습니다.',
+    '해시태그 #운동루틴 사용 시 노출이 35% 증가합니다.',
+  ],
+  recommendation: '릴스 콘텐츠 비중을 현재 40%에서 60%로 확대하고, 오후 6-9시에 집중 게시하는 것을 권장합니다. 스토리에 제품 링크를 더 적극적으로 활용하세요.',
+  generatedAt: '2024-12-14T15:30:00Z',
+};
+
+const profileActions = {
+  profileVisits: 8934,
+  websiteClicks: 2345,
+};
+
+// 콘텐츠 성과 더미 데이터
+type ContentType = 'reels' | 'feed' | 'story';
+
+interface ContentItem {
+  id: string;
+  type: ContentType;
+  uploadDate: string;
+  views: number;
+  reach: number;
+  impressions: number;
+  likes: number;
+  comments: number;
+  saves: number;
+  engagementRate: number;
+}
+
+const contentPerformanceData: ContentItem[] = [
+  { id: '1', type: 'reels', uploadDate: '2024-12-14', views: 45230, reach: 38920, impressions: 52340, likes: 2341, comments: 156, saves: 423, engagementRate: 6.8 },
+  { id: '2', type: 'feed', uploadDate: '2024-12-13', views: 12450, reach: 10230, impressions: 15670, likes: 1823, comments: 89, saves: 312, engagementRate: 5.2 },
+  { id: '3', type: 'reels', uploadDate: '2024-12-12', views: 67890, reach: 54230, impressions: 78450, likes: 4521, comments: 234, saves: 678, engagementRate: 8.1 },
+  { id: '4', type: 'feed', uploadDate: '2024-12-11', views: 8970, reach: 7650, impressions: 11230, likes: 945, comments: 67, saves: 189, engagementRate: 4.5 },
+  { id: '5', type: 'reels', uploadDate: '2024-12-10', views: 34560, reach: 28970, impressions: 41230, likes: 2890, comments: 178, saves: 456, engagementRate: 7.2 },
+  { id: '6', type: 'feed', uploadDate: '2024-12-09', views: 15670, reach: 12340, impressions: 19870, likes: 1456, comments: 98, saves: 267, engagementRate: 5.8 },
+];
+
+// KPI 카드 컴포넌트 (로컬) - 광고 성과와 동일한 스타일
+function ProfileKPICard({
+  title,
+  value,
+  change,
+  isPositive,
+  metricKey,
+  loading,
+}: {
+  title: string;
+  value: string;
+  change: number;
+  isPositive: boolean;
+  metricKey?: string;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse h-[100px]">
+        <div className="h-3 bg-slate-200 rounded w-16 mb-2" />
+        <div className="h-6 bg-slate-200 rounded w-24 mb-1" />
+        <div className="h-3 bg-slate-200 rounded w-20" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-slate-500">{title}</span>
+        {metricKey && <InfoTooltip metricKey={metricKey} />}
+      </div>
+      <div>
+        <div className="text-2xl font-bold text-slate-900 leading-tight">{value}</div>
+      </div>
+      <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+        <span>전월 대비 {change > 0 ? '+' : ''}{change.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
+export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps) {
+  const [contentFilter, setContentFilter] = useState<'all' | ContentType>('all');
+
+  const filteredContent = contentFilter === 'all'
+    ? contentPerformanceData
+    : contentPerformanceData.filter(item => item.type === contentFilter);
+
+  // 참여율 높은 순으로 정렬
+  const sortedContent = [...filteredContent].sort((a, b) => b.engagementRate - a.engagementRate);
+
+  if (!profileData) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-500">
+        데이터를 불러오는 중...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 메인 레이아웃: 콘텐츠 + AI 분석 사이드바 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 왼쪽 메인 콘텐츠 영역 */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* 1. 핵심 KPI 카드 - 2열 x 2행 */}
+          <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <ProfileKPICard
+              title="팔로워"
+              value={formatNumber(profileData.followers)}
+              change={profileData.followersGrowth}
+              isPositive={profileData.followersGrowth >= 0}
+              metricKey="followers"
+              loading={loading}
+            />
+            <ProfileKPICard
+              title="도달"
+              value={formatNumber(profileData.reach)}
+              change={profileData.reachGrowth}
+              isPositive={profileData.reachGrowth >= 0}
+              metricKey="reach"
+              loading={loading}
+            />
+            <ProfileKPICard
+              title="참여율"
+              value={profileData.engagementRate.toFixed(1) + '%'}
+              change={8.2}
+              isPositive={true}
+              metricKey="engagementRate"
+              loading={loading}
+            />
+            <ProfileKPICard
+              title="노출"
+              value={formatNumber(profileData.impressions)}
+              change={12.3}
+              isPositive={true}
+              metricKey="impressions"
+              loading={loading}
+            />
+          </section>
+
+      {/* 2. 프로필 행동 */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
+          <span className="text-xs text-slate-500">프로필 방문</span>
+          <div className="text-2xl font-bold text-slate-900">{profileActions.profileVisits.toLocaleString()}</div>
+          <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+            <TrendingUp size={12} />
+            <span>전월 대비 +12.5%</span>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
+          <span className="text-xs text-slate-500">웹사이트 클릭</span>
+          <div className="text-2xl font-bold text-slate-900">{profileActions.websiteClicks.toLocaleString()}</div>
+          <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+            <TrendingUp size={12} />
+            <span>전월 대비 +8.3%</span>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
+          <span className="text-xs text-slate-500">클릭률</span>
+          <div className="text-2xl font-bold text-slate-900">
+            {((profileActions.websiteClicks / profileActions.profileVisits) * 100).toFixed(1)}%
+          </div>
+          <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+            <TrendingUp size={12} />
+            <span>전월 대비 +2.1%</span>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. 성장 추이 차트 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 팔로워 성장 추이 */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <h3 className="text-lg font-semibold text-primary-950">팔로워 성장 추이</h3>
+            <InfoTooltip metricKey="followers" />
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyData || []}>
+                <defs>
+                  <linearGradient id="colorFollowers" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={formatNumber} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    color: '#fff',
+                  }}
+                  formatter={(value: number) => [formatNumber(value), '팔로워']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="followers"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  fill="url(#colorFollowers)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* 도달 & 노출 */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <h3 className="text-lg font-semibold text-primary-950">도달 & 노출</h3>
+            <InfoTooltip metricKey="impressions" />
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyData || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={formatNumber} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    color: '#fff',
+                  }}
+                  formatter={(value: number, name: string) => [
+                    formatNumber(value),
+                    name === 'reach' ? '도달' : '노출',
+                  ]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="reach"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={{ fill: '#10b981', r: 3 }}
+                  name="reach"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="impressions"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={{ fill: '#8b5cf6', r: 3 }}
+                  name="impressions"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex justify-center gap-6 mt-2">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-sm text-slate-600">도달</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-violet-500" />
+              <span className="text-sm text-slate-600">노출</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* 4. 콘텐츠 성과 */}
+      <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h3 className="text-lg font-semibold text-primary-950">콘텐츠 성과</h3>
+
+          <div className="flex items-center gap-4">
+            {/* 필터 탭 */}
+            <div className="flex bg-slate-100 rounded-lg p-1">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'reels', label: 'Reels' },
+                { key: 'feed', label: 'Feed' },
+                { key: 'story', label: 'Story' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setContentFilter(key as 'all' | ContentType)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    contentFilter === key
+                      ? 'bg-white text-primary-950 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* 정렬 옵션 */}
+            <div className="text-sm text-slate-500">
+              참여율 높은 순
+            </div>
+          </div>
+        </div>
+
+        {/* 콘텐츠 테이블 */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">썸네일</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">유형</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">업로드 날짜</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">조회수</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">도달</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">노출</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">좋아요</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">댓글</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">저장</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">참여율</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedContent.map((item, index) => (
+                <tr key={item.id} className={index < sortedContent.length - 1 ? 'border-b border-slate-100' : ''}>
+                  {/* 썸네일 */}
+                  <td className="py-4 px-4">
+                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                      {item.type === 'reels' ? (
+                        <Play size={20} className="text-slate-400" />
+                      ) : (
+                        <Image size={20} className="text-slate-400" />
+                      )}
+                    </div>
+                  </td>
+                  {/* 유형 */}
+                  <td className="py-4 px-4">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                      item.type === 'reels'
+                        ? 'bg-blue-100 text-blue-700'
+                        : item.type === 'feed'
+                        ? 'bg-slate-100 text-slate-700'
+                        : 'bg-purple-100 text-purple-700'
+                    }`}>
+                      {item.type === 'reels' ? 'Reels' : item.type === 'feed' ? 'Feed' : 'Story'}
+                    </span>
+                  </td>
+                  {/* 업로드 날짜 */}
+                  <td className="py-4 px-4 text-sm text-slate-600">{item.uploadDate}</td>
+                  {/* 조회수 */}
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.views.toLocaleString()}</td>
+                  {/* 도달 */}
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.reach.toLocaleString()}</td>
+                  {/* 노출 */}
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.impressions.toLocaleString()}</td>
+                  {/* 좋아요 */}
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.likes.toLocaleString()}</td>
+                  {/* 댓글 */}
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.comments.toLocaleString()}</td>
+                  {/* 저장 */}
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.saves.toLocaleString()}</td>
+                  {/* 참여율 */}
+                  <td className="py-4 px-4 text-right">
+                    <span className="text-sm font-medium text-emerald-600">{item.engagementRate}%</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 5. 스토리 성과 (KPI + 테이블 통합) */}
+      <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <h3 className="text-lg font-semibold text-primary-950 mb-4">스토리 성과</h3>
+
+        {/* 스토리 KPI */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="p-4 border border-slate-200 rounded-xl text-center">
+            <div className="text-xs text-slate-500 mb-1">평균 조회수</div>
+            <div className="text-2xl font-bold text-primary-950">{storyStats.avgViews.toLocaleString()}</div>
+          </div>
+          <div className="p-4 border border-slate-200 rounded-xl text-center">
+            <div className="text-xs text-slate-500 mb-1">스토리 도달</div>
+            <div className="text-2xl font-bold text-primary-950">{storyStats.reach.toLocaleString()}</div>
+          </div>
+          <div className="p-4 border border-slate-200 rounded-xl text-center">
+            <div className="text-xs text-slate-500 mb-1">링크 클릭</div>
+            <div className="text-2xl font-bold text-primary-950">{storyStats.linkClicks.toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/* 스토리 일별 테이블 */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">날짜</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">스토리 수</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">총 조회수</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">링크 클릭</th>
+              </tr>
+            </thead>
+            <tbody>
+              {storyPerformanceData.map((item, index) => (
+                <tr key={item.date} className={index < storyPerformanceData.length - 1 ? 'border-b border-slate-100' : ''}>
+                  <td className="py-4 px-4 text-sm text-slate-700">{item.date}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-center">{item.stories}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-center">{item.views.toLocaleString()}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-center">{item.linkClicks}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+        </div>
+
+        {/* 오른쪽 AI 분석 사이드바 */}
+        <div className="lg:col-span-1">
+          <div className="bg-gradient-to-br from-primary-950 to-primary-900 rounded-2xl shadow-sm p-6 text-white sticky top-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-white/10 rounded-xl">
+                <Sparkles size={20} className="text-amber-400" />
+              </div>
+              <h3 className="text-lg font-semibold">AI 프로필 분석</h3>
+            </div>
+
+            <p className="text-primary-100 text-sm leading-relaxed mb-5 pb-5 border-b border-primary-800">
+              {profileAIAnalysis.summary}
+            </p>
+
+            <div className="space-y-3 mb-5">
+              {profileAIAnalysis.insights.map((insight, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="w-5 h-5 rounded-full bg-primary-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-xs font-medium text-primary-300">{index + 1}</span>
+                  </div>
+                  <p className="text-sm text-primary-200 leading-relaxed">{insight}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+              <div className="text-xs font-semibold text-amber-400 mb-1">💡 추천 전략</div>
+              <p className="text-sm text-amber-100/90 leading-relaxed">{profileAIAnalysis.recommendation}</p>
+            </div>
+
+            <div className="mt-4 text-xs text-primary-400">
+              마지막 업데이트: {new Date(profileAIAnalysis.generatedAt).toLocaleString('ko-KR')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

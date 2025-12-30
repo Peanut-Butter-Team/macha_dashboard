@@ -1,0 +1,523 @@
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  ComposedChart,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
+import {
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+} from 'lucide-react';
+import { InfoTooltip } from '../common/InfoTooltip';
+import type { AdPerformance, DailyAdData } from '../../types';
+
+interface AdsTabProps {
+  adData: AdPerformance | null;
+  dailyData: DailyAdData[] | null;
+  loading: boolean;
+}
+
+const formatNumber = (num: number): string => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toLocaleString();
+};
+
+const formatCurrency = (num: number): string => {
+  if (num >= 100000000) return '₩' + (num / 100000000).toFixed(1) + '억';
+  if (num >= 10000000) return '₩' + (num / 10000).toFixed(0) + '만';
+  if (num >= 10000) return '₩' + (num / 10000).toFixed(0) + '만';
+  return '₩' + num.toLocaleString();
+};
+
+// 유기적 vs 광고 데이터 (더미)
+const reachSourceData = [
+  { name: '광고 도달', value: 69, color: '#f59e0b' },
+  { name: '유기적 도달', value: 31, color: '#6366f1' },
+];
+
+const engagementSourceData = [
+  { name: '유기적 참여', value: 58, color: '#ec4899' },
+  { name: '광고 참여', value: 42, color: '#8b5cf6' },
+];
+
+// 광고 캠페인별 성과 더미 데이터
+interface CampaignData {
+  id: string;
+  name: string;
+  spend: number;
+  roas: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  status: 'active' | 'paused' | 'completed';
+}
+
+const campaignPerformanceData: CampaignData[] = [
+  { id: '1', name: '신제품 론칭 캠페인', spend: 850000, roas: 5.2, reach: 523000, clicks: 45200, ctr: 3.1, cpc: 320, status: 'active' },
+  { id: '2', name: '여름 시즌 프로모션', spend: 720000, roas: 4.6, reach: 412000, clicks: 38900, ctr: 2.8, cpc: 350, status: 'active' },
+  { id: '3', name: '브랜드 인지도 캠페인', spend: 560000, roas: 3.2, reach: 687000, clicks: 28400, ctr: 2.1, cpc: 410, status: 'active' },
+  { id: '4', name: '리타게팅 캠페인', spend: 320000, roas: 6.8, reach: 98000, clicks: 42700, ctr: 4.5, cpc: 280, status: 'active' },
+];
+
+// 광고 AI 분석 데이터
+const adAIAnalysis = {
+  summary: '이번 캠페인은 전월 대비 ROAS가 23% 상승하며 우수한 성과를 기록하고 있습니다. 특히 리타게팅 캠페인의 전환율이 기대 이상입니다.',
+  insights: [
+    '리타게팅 캠페인이 ROAS 6.8x로 가장 높은 수익률을 기록 중입니다.',
+    '주말(토-일) 광고 효율이 평일 대비 35% 높게 나타났습니다.',
+    '25-34세 여성 타겟층에서 가장 높은 전환이 발생했습니다.',
+    'CPC가 전월 대비 12% 감소하여 비용 효율이 개선되었습니다.',
+    '브랜드 인지도 캠페인은 도달은 높으나 전환율 개선이 필요합니다.',
+  ],
+  recommendation: '리타게팅 캠페인 예산을 20% 증액하고, 브랜드 인지도 캠페인의 크리에이티브를 교체하는 것을 권장합니다. 주말 집중 노출 전략도 검토해 주세요.',
+  generatedAt: '2024-12-14T15:30:00Z',
+};
+
+// KPI 카드 컴포넌트 (로컬) - 컴팩트 버전
+function AdKPICard({
+  title,
+  value,
+  subValue,
+  change,
+  isPositive,
+  metricKey,
+  loading,
+}: {
+  title: string;
+  value: string;
+  subValue?: string;
+  change: number;
+  isPositive: boolean;
+  metricKey?: string;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse h-[100px]">
+        <div className="h-3 bg-slate-200 rounded w-16 mb-2" />
+        <div className="h-6 bg-slate-200 rounded w-24 mb-1" />
+        <div className="h-3 bg-slate-200 rounded w-20" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-slate-500">{title}</span>
+        {metricKey && <InfoTooltip metricKey={metricKey} />}
+      </div>
+      <div>
+        <div className="text-2xl font-bold text-slate-900 leading-tight">{value}</div>
+        {subValue && <div className="text-xs text-slate-400">{subValue}</div>}
+      </div>
+      <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+        <span>전월 대비 {change > 0 ? '+' : ''}{change.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
+// 파이 차트 컴포넌트
+function SourcePieChart({
+  title,
+  data,
+}: {
+  title: string;
+  data: { name: string; value: number; color: string }[];
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <h4 className="text-lg font-semibold text-slate-900 mb-4">{title}</h4>
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={50}
+              outerRadius={80}
+              paddingAngle={2}
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      {/* Legend */}
+      <div className="flex justify-center gap-6 mt-4">
+        {data.map((item, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="text-sm text-slate-600">
+              {item.name}
+            </span>
+            <span
+              className="text-sm font-semibold"
+              style={{ color: item.color }}
+            >
+              {item.value}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function AdsTab({ adData, dailyData, loading }: AdsTabProps) {
+  if (!adData) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-500">
+        데이터를 불러오는 중...
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 메인 콘텐츠 영역 */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* KPI Cards - 3개씩 2열 */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <AdKPICard
+          title="총 광고 지출"
+          value={formatCurrency(adData.spend)}
+          change={adData.spendGrowth}
+          isPositive={true}
+          metricKey="spend"
+          loading={loading}
+        />
+        <AdKPICard
+          title="ROAS"
+          value={adData.roas.toFixed(1) + 'x'}
+          change={adData.roasGrowth}
+          isPositive={adData.roasGrowth >= 0}
+          metricKey="roas"
+          loading={loading}
+        />
+        <AdKPICard
+          title="광고 도달"
+          value={formatNumber(adData.impressions / adData.frequency)}
+          change={15.2}
+          isPositive={true}
+          metricKey="reach"
+          loading={loading}
+        />
+        <AdKPICard
+          title="광고 클릭"
+          value={formatNumber(adData.clicks)}
+          change={10.7}
+          isPositive={true}
+          metricKey="clicks"
+          loading={loading}
+        />
+        <AdKPICard
+          title="CTR"
+          value={adData.ctr.toFixed(1) + '%'}
+          change={adData.ctrGrowth}
+          isPositive={adData.ctrGrowth >= 0}
+          metricKey="ctr"
+          loading={loading}
+        />
+        <AdKPICard
+          title="CPC"
+          value={'₩' + adData.cpc.toLocaleString()}
+          change={adData.cpcGrowth}
+          isPositive={adData.cpcGrowth <= 0}
+          metricKey="cpc"
+          loading={loading}
+        />
+      </section>
+
+      {/* 광고 캠페인별 성과 */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-6">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">광고 캠페인별 성과</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">캠페인명</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">광고 지출</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">ROAS</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">광고 도달</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">광고 클릭</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">CTR</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">CPC</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaignPerformanceData.map((campaign, index) => (
+                <tr key={campaign.id} className={index < campaignPerformanceData.length - 1 ? 'border-b border-slate-100' : ''}>
+                  <td className="py-4 px-4 text-sm text-slate-700">{campaign.name}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">₩{campaign.spend.toLocaleString()}</td>
+                  <td className="py-4 px-4 text-sm font-semibold text-emerald-600 text-right">{campaign.roas}x</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{formatNumber(campaign.reach)}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{formatNumber(campaign.clicks)}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{campaign.ctr}%</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">₩{campaign.cpc.toLocaleString()}</td>
+                  <td className="py-4 px-4 text-center">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                      campaign.status === 'active'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : campaign.status === 'paused'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {campaign.status === 'active' ? '진행중' : campaign.status === 'paused' ? '일시정지' : '완료'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Main Performance Chart */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-slate-900">일별 광고 성과</h3>
+            <InfoTooltip metricKey="roas" />
+          </div>
+          <div className="flex items-center gap-6 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-primary-500" />
+              <span className="text-slate-600">ROAS</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-slate-600">전환</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-violet-200" />
+              <span className="text-slate-600">지출</span>
+            </div>
+          </div>
+        </div>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={dailyData || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#64748b' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#fff',
+                  padding: '12px',
+                }}
+                formatter={(value: number, name: string) => {
+                  if (name === 'ROAS') return [value + 'x', name];
+                  if (name === '지출') return [formatCurrency(value), name];
+                  return [formatNumber(value), name];
+                }}
+              />
+              <Bar yAxisId="right" dataKey="spend" fill="#ddd6fe" name="지출" radius={[4, 4, 0, 0]} />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="roas"
+                stroke="#2563eb"
+                strokeWidth={3}
+                dot={{ fill: '#2563eb', r: 4 }}
+                name="ROAS"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="conversions"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={{ fill: '#10b981', r: 3 }}
+                name="전환"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
+      {/* Secondary Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* CTR Trend */}
+        <section className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <h3 className="text-lg font-semibold text-slate-900">CTR 추이</h3>
+            <InfoTooltip metricKey="ctr" />
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyData || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => v + '%'} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    color: '#fff',
+                  }}
+                  formatter={(value: number) => [value.toFixed(2) + '%', 'CTR']}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="ctr"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={{ fill: '#f59e0b', r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* Clicks */}
+        <section className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <h3 className="text-lg font-semibold text-slate-900">일별 클릭</h3>
+            <InfoTooltip metricKey="clicks" />
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyData || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={formatNumber} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    color: '#fff',
+                  }}
+                  formatter={(value: number) => [formatNumber(value), '클릭']}
+                />
+                <Bar dataKey="clicks" fill="#2563eb" name="clicks" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </div>
+
+      {/* 유기적 vs 광고 성과 비교 */}
+      <section>
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">유기적 vs 광고 성과 비교</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SourcePieChart title="도달 출처" data={reachSourceData} />
+          <SourcePieChart title="참여 출처" data={engagementSourceData} />
+        </div>
+      </section>
+
+      {/* 전환 행동 비교 */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-6">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">전환 행동 비교</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">지표</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">유기적</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">광고</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">전체</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">광고 기여도</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-slate-100">
+                <td className="py-4 px-4 text-sm text-slate-700">프로필 방문</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">8,934</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">15,234</td>
+                <td className="py-4 px-4 text-sm font-medium text-slate-700 text-center">24,168</td>
+                <td className="py-4 px-4 text-sm font-semibold text-blue-600 text-center">63.0%</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="py-4 px-4 text-sm text-slate-700">웹사이트 클릭</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">2,345</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">6,789</td>
+                <td className="py-4 px-4 text-sm font-medium text-slate-700 text-center">9,134</td>
+                <td className="py-4 px-4 text-sm font-semibold text-blue-600 text-center">74.3%</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="py-4 px-4 text-sm text-slate-700">팔로우</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">847</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">1,523</td>
+                <td className="py-4 px-4 text-sm font-medium text-slate-700 text-center">2,370</td>
+                <td className="py-4 px-4 text-sm font-semibold text-blue-600 text-center">64.3%</td>
+              </tr>
+              <tr>
+                <td className="py-4 px-4 text-sm text-slate-700">저장</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">1,234</td>
+                <td className="py-4 px-4 text-sm text-slate-600 text-center">892</td>
+                <td className="py-4 px-4 text-sm font-medium text-slate-700 text-center">2,126</td>
+                <td className="py-4 px-4 text-sm font-semibold text-blue-600 text-center">42.0%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      </div>
+
+      {/* AI 분석 사이드바 */}
+      <div className="lg:col-span-1">
+        <div className="bg-gradient-to-br from-primary-950 to-primary-900 rounded-2xl shadow-sm p-6 text-white sticky top-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 bg-white/10 rounded-xl">
+              <Sparkles size={20} className="text-amber-400" />
+            </div>
+            <h3 className="text-lg font-semibold">AI 광고 분석</h3>
+          </div>
+
+          <p className="text-primary-100 text-sm leading-relaxed mb-5 pb-5 border-b border-primary-800">
+            {adAIAnalysis.summary}
+          </p>
+
+          <div className="space-y-3 mb-5">
+            {adAIAnalysis.insights.map((insight, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <div className="w-5 h-5 rounded-full bg-primary-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-xs font-medium text-primary-300">{index + 1}</span>
+                </div>
+                <p className="text-sm text-primary-200 leading-relaxed">{insight}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+            <div className="text-xs font-semibold text-amber-400 mb-1">💡 추천 액션</div>
+            <p className="text-sm text-amber-100/90 leading-relaxed">{adAIAnalysis.recommendation}</p>
+          </div>
+
+          <div className="mt-4 text-xs text-primary-400">
+            마지막 업데이트: {new Date(adAIAnalysis.generatedAt).toLocaleString('ko-KR')}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
