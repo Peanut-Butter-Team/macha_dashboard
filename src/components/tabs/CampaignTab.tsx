@@ -577,25 +577,95 @@ function CampaignPerformance({
     };
   }, [contents]);
 
-  // 실제 데이터 기반 차트 데이터 생성
-  const chartDataFromNotion = useMemo(() => {
-    const dailyData = performanceData.dailyData;
+  // 기간 필터링된 데이터 생성
+  const filteredChartData = useMemo(() => {
+    if (!contents || contents.length === 0) {
+      return { likes: [], views: [], engagement: [] };
+    }
 
-    // 일별 데이터를 차트 형식으로 변환
-    const likes = dailyData.map((d) => ({ date: d.date, value: d.likes }));
-    const views = dailyData.map((d) => ({ date: d.date, value: d.views }));
-    const engagement = dailyData.map((d) => ({ date: d.date, shares: d.shares, comments: d.comments }));
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    // 기간별 시작/종료일 계산
+    switch (periodFilter) {
+      case 'daily':
+        // 최근 7일
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case 'weekly':
+        // 최근 4주
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 28);
+        break;
+      case 'monthly':
+        // 최근 3개월
+        startDate = new Date(now);
+        startDate.setMonth(startDate.getMonth() - 3);
+        break;
+      case 'custom':
+        startDate = new Date(customDateRange.start);
+        endDate = new Date(customDateRange.end);
+        break;
+      default:
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 7);
+    }
+
+    // 기간 내 콘텐츠 필터링
+    const filteredContents = contents.filter((c) => {
+      if (!c.postedAt) return false;
+      const postedDate = new Date(c.postedAt);
+      return postedDate >= startDate && postedDate <= endDate;
+    });
+
+    // 집계 방식 결정
+    const aggregateByWeek = periodFilter === 'weekly' || periodFilter === 'monthly';
+    const dataMap = new Map<string, { likes: number; comments: number; shares: number; views: number }>();
+
+    filteredContents.forEach((c) => {
+      if (!c.postedAt) return;
+
+      const postedDate = new Date(c.postedAt);
+      let key: string;
+
+      if (aggregateByWeek && periodFilter === 'weekly') {
+        // 주별 집계: 해당 주의 월요일 기준
+        const weekStart = new Date(postedDate);
+        weekStart.setDate(postedDate.getDate() - postedDate.getDay() + 1);
+        key = `${weekStart.getMonth() + 1}/${weekStart.getDate()}주`;
+      } else if (periodFilter === 'monthly') {
+        // 월별 집계
+        key = `${postedDate.getFullYear()}.${String(postedDate.getMonth() + 1).padStart(2, '0')}`;
+      } else {
+        // 일별 집계
+        key = postedDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+      }
+
+      const existing = dataMap.get(key) || { likes: 0, comments: 0, shares: 0, views: 0 };
+      dataMap.set(key, {
+        likes: existing.likes + (c.likes || 0),
+        comments: existing.comments + (c.comments || 0),
+        shares: existing.shares + (c.shares || 0),
+        views: existing.views + (c.views || 0),
+      });
+    });
+
+    // 정렬된 배열로 변환
+    const sortedData = Array.from(dataMap.entries())
+      .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     return {
-      daily: { likes, views, engagement },
-      weekly: { likes, views, engagement }, // 현재는 일별 데이터 사용 (추후 주별 집계 가능)
-      monthly: { likes, views, engagement },
-      custom: { likes, views, engagement },
+      likes: sortedData.map((d) => ({ date: d.date, value: d.likes })),
+      views: sortedData.map((d) => ({ date: d.date, value: d.views })),
+      engagement: sortedData.map((d) => ({ date: d.date, shares: d.shares, comments: d.comments })),
     };
-  }, [performanceData.dailyData]);
+  }, [contents, periodFilter, customDateRange]);
 
   // 현재 선택된 기간의 데이터
-  const currentData = chartDataFromNotion[periodFilter];
+  const currentData = filteredChartData;
 
   // 로딩 상태
   if (loading) {
