@@ -40,6 +40,28 @@ export default async function handler(req, res) {
 
     const response = await notion.databases.query(queryOptions);
 
+    // 첫 번째 결과의 속성 구조 로깅 (디버깅용)
+    if (response.results.length > 0) {
+      const firstProps = response.results[0].properties;
+      console.log('[Mentions API] Available properties:', Object.keys(firstProps));
+
+      // 썸네일 관련 필드 찾기
+      const thumbnailFields = Object.keys(firstProps).filter(key =>
+        key.toLowerCase().includes('thumbnail') ||
+        key.toLowerCase().includes('image') ||
+        key.toLowerCase().includes('display') ||
+        key.toLowerCase().includes('url') ||
+        key.toLowerCase().includes('사진') ||
+        key.toLowerCase().includes('이미지')
+      );
+      console.log('[Mentions API] Potential thumbnail fields:', thumbnailFields);
+
+      // 각 잠재적 썸네일 필드의 값 로깅
+      thumbnailFields.forEach(field => {
+        console.log(`[Mentions API] ${field}:`, JSON.stringify(firstProps[field], null, 2));
+      });
+    }
+
     // Post URL 기준으로 중복 제거 (최신 데이터만 유지)
     const seenPostUrls = new Map();
 
@@ -53,9 +75,43 @@ export default async function handler(req, res) {
       // 이미 본 URL이면 스킵 (최신 데이터가 먼저 오므로)
       if (seenPostUrls.has(postUrl)) return;
 
-      // 썸네일 URL 추출
-      const thumbnailFile = props['displayUrl']?.files?.[0];
-      const thumbnail = thumbnailFile?.external?.url || thumbnailFile?.file?.url || '';
+      // 썸네일 URL 추출 (여러 가능한 필드 시도)
+      let thumbnail = '';
+
+      // 1. displayUrl 필드
+      const displayUrlFile = props['displayUrl']?.files?.[0];
+      if (displayUrlFile) {
+        thumbnail = displayUrlFile?.external?.url || displayUrlFile?.file?.url || '';
+      }
+
+      // 2. thumbnail 필드
+      if (!thumbnail) {
+        const thumbnailFile = props['thumbnail']?.files?.[0];
+        if (thumbnailFile) {
+          thumbnail = thumbnailFile?.external?.url || thumbnailFile?.file?.url || '';
+        }
+      }
+
+      // 3. image 필드
+      if (!thumbnail) {
+        const imageFile = props['image']?.files?.[0];
+        if (imageFile) {
+          thumbnail = imageFile?.external?.url || imageFile?.file?.url || '';
+        }
+      }
+
+      // 4. 이미지 필드 (한글)
+      if (!thumbnail) {
+        const imageKorFile = props['이미지']?.files?.[0];
+        if (imageKorFile) {
+          thumbnail = imageKorFile?.external?.url || imageKorFile?.file?.url || '';
+        }
+      }
+
+      // 5. URL 타입의 displayUrl
+      if (!thumbnail && props['displayUrl']?.url) {
+        thumbnail = props['displayUrl'].url;
+      }
 
       const mention = {
         id: page.id,
