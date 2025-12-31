@@ -6,19 +6,48 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // 공통 fetch 래퍼
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    ...options,
-  });
+  const url = `${API_BASE_URL}${endpoint}`;
+  console.log('[NotionAPI] Fetching:', url);
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `API Error: ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...options,
+    });
+
+    console.log('[NotionAPI] Response status:', response.status);
+    console.log('[NotionAPI] Response headers:', Object.fromEntries(response.headers.entries()));
+
+    // 응답 텍스트를 먼저 가져옴
+    const text = await response.text();
+    console.log('[NotionAPI] Response body (first 500 chars):', text.substring(0, 500));
+
+    if (!response.ok) {
+      let errorMessage = `API Error: ${response.status}`;
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        // JSON 파싱 실패시 텍스트 그대로 사용
+        if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+          errorMessage = 'API가 HTML을 반환했습니다. 라우팅 설정을 확인하세요.';
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
+    // JSON 파싱
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error('응답이 유효한 JSON이 아닙니다.');
+    }
+  } catch (error) {
+    console.error('[NotionAPI] Fetch error:', error);
+    throw error;
   }
-
-  return response.json();
 }
 
 // ============================================
@@ -61,6 +90,7 @@ export interface NotionInfluencer {
 export interface NotionMention {
   id: string;
   influencerName: string;
+  handle: string;
   platform: string;
   type: string;
   likes: number;
@@ -73,6 +103,7 @@ export interface NotionMention {
   postUrl: string;
   postedAt: string;
   caption: string;
+  thumbnail: string;
 }
 
 export interface NotionDailyReport {

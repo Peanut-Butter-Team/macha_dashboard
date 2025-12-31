@@ -33,7 +33,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { InfoTooltip } from '../common/InfoTooltip';
-import { fetchCampaigns, type NotionCampaign } from '../../services/notionApi';
+import { fetchCampaigns, fetchMentions, fetchSeeding, type NotionCampaign, type NotionMention, type NotionSeeding } from '../../services/notionApi';
 import type {
   Influencer,
   SeedingItem,
@@ -1040,23 +1040,99 @@ function CampaignListTable({
   );
 }
 
+// Notion 시딩 데이터를 SeedingItem으로 변환
+function convertNotionSeeding(seeding: NotionSeeding): SeedingItem {
+  return {
+    id: seeding.id,
+    campaignId: '',
+    influencer: {
+      id: seeding.influencer.id,
+      name: seeding.influencer.name,
+      handle: seeding.influencer.handle,
+      platform: 'instagram',
+      thumbnail: seeding.influencer.thumbnail,
+      followers: seeding.influencer.followers,
+      engagementRate: seeding.influencer.engagementRate,
+      avgLikes: 0,
+      avgComments: 0,
+      category: [],
+      priceRange: '',
+      verified: false,
+    },
+    type: seeding.type,
+    status: seeding.status as SeedingStatus,
+    requestDate: seeding.requestDate || '',
+    postDate: seeding.postDate,
+    paymentAmount: seeding.paymentAmount,
+    productValue: seeding.productValue,
+    notes: seeding.notes,
+  };
+}
+
+// Notion 멘션 데이터를 ContentItem으로 변환
+function convertNotionMention(mention: NotionMention): ContentItem {
+  return {
+    id: mention.id,
+    influencerId: '',
+    influencerName: mention.influencerName || mention.handle,
+    platform: 'instagram',
+    type: (mention.type as 'image' | 'video' | 'reel' | 'story') || 'image',
+    thumbnail: mention.thumbnail || 'https://via.placeholder.com/300x400',
+    originalUrl: mention.postUrl,
+    downloadUrl: mention.postUrl,
+    likes: mention.likes,
+    comments: mention.comments,
+    views: mention.views,
+    engagementRate: mention.engagementRate,
+    postedAt: mention.postedAt,
+    caption: mention.caption,
+  };
+}
+
 // 캠페인 상세 뷰 컴포넌트
 function CampaignDetailView({
   campaign,
   onBack: _onBack,
-  seedingList,
   affiliateLinks,
-  contentList,
   aiAnalysis,
 }: {
   campaign: CampaignListItem;
   onBack: () => void;
-  seedingList: SeedingItem[] | null;
   affiliateLinks: AffiliateLink[] | null;
-  contentList: ContentItem[] | null;
   aiAnalysis: AIAnalysis | null;
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'performance' | 'seeding' | 'affiliate' | 'content'>('performance');
+  const [notionSeeding, setNotionSeeding] = useState<SeedingItem[]>([]);
+  const [notionContent, setNotionContent] = useState<ContentItem[]>([]);
+  const [detailLoading, setDetailLoading] = useState(true);
+
+  // Notion에서 상세 데이터 로드
+  useEffect(() => {
+    const loadDetailData = async () => {
+      try {
+        setDetailLoading(true);
+        console.log('[CampaignDetail] Loading detail data for campaign:', campaign.id);
+
+        // 시딩과 멘션 데이터 병렬 로드
+        const [seedingData, mentionsData] = await Promise.all([
+          fetchSeeding(campaign.id),
+          fetchMentions(campaign.id),
+        ]);
+
+        console.log('[CampaignDetail] Seeding data:', seedingData);
+        console.log('[CampaignDetail] Mentions data:', mentionsData);
+
+        setNotionSeeding(seedingData.map(convertNotionSeeding));
+        setNotionContent(mentionsData.map(convertNotionMention));
+      } catch (err) {
+        console.error('[CampaignDetail] 상세 데이터 로드 실패:', err);
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+
+    loadDetailData();
+  }, [campaign.id]);
 
   return (
     <div className="space-y-6">
@@ -1087,9 +1163,27 @@ function CampaignDetailView({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           {activeSubTab === 'performance' && <CampaignPerformance campaign={campaign} />}
-          {activeSubTab === 'seeding' && seedingList && <SeedingManagement seedingList={seedingList.filter(item => item.campaignId === campaign.id)} />}
+          {activeSubTab === 'seeding' && (
+            detailLoading ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center h-32">
+                <Loader2 className="w-6 h-6 animate-spin mr-2 text-primary-600" />
+                <span className="text-slate-500">인플루언서 데이터 로딩 중...</span>
+              </div>
+            ) : (
+              <SeedingManagement seedingList={notionSeeding} />
+            )
+          )}
           {activeSubTab === 'affiliate' && affiliateLinks && <AffiliateLinkManager links={affiliateLinks} />}
-          {activeSubTab === 'content' && contentList && <ContentGallery contents={contentList} />}
+          {activeSubTab === 'content' && (
+            detailLoading ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center h-32">
+                <Loader2 className="w-6 h-6 animate-spin mr-2 text-primary-600" />
+                <span className="text-slate-500">콘텐츠 데이터 로딩 중...</span>
+              </div>
+            ) : (
+              <ContentGallery contents={notionContent} />
+            )
+          )}
         </div>
 
         {/* AI Analysis Sidebar */}
@@ -1118,9 +1212,9 @@ function convertNotionCampaign(campaign: NotionCampaign): CampaignListItem {
 // Main Component
 export function CampaignTab({
   influencers: _influencers,
-  seedingList,
+  seedingList: _seedingList,
   affiliateLinks,
-  contentList,
+  contentList: _contentList,
   aiAnalysis,
   loading: _loading,
 }: CampaignTabProps) {
@@ -1135,12 +1229,16 @@ export function CampaignTab({
       try {
         setNotionLoading(true);
         setError(null);
+        console.log('[CampaignTab] Starting to load campaigns...');
         const notionCampaigns = await fetchCampaigns();
+        console.log('[CampaignTab] Loaded campaigns:', notionCampaigns);
         const convertedCampaigns = notionCampaigns.map(convertNotionCampaign);
         setCampaigns(convertedCampaigns);
+        console.log('[CampaignTab] Set campaigns:', convertedCampaigns.length);
       } catch (err) {
-        console.error('캠페인 로드 실패:', err);
-        setError('캠페인 데이터를 불러오는데 실패했습니다.');
+        console.error('[CampaignTab] 캠페인 로드 실패:', err);
+        const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류';
+        setError(`캠페인 데이터를 불러오는데 실패했습니다: ${errorMessage}`);
       } finally {
         setNotionLoading(false);
       }
@@ -1170,9 +1268,7 @@ export function CampaignTab({
       <CampaignDetailView
         campaign={selectedCampaign}
         onBack={() => setSelectedCampaign(null)}
-        seedingList={seedingList}
         affiliateLinks={affiliateLinks}
-        contentList={contentList}
         aiAnalysis={aiAnalysis}
       />
     );
