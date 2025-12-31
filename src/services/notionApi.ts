@@ -1,7 +1,8 @@
 // Notion API 서비스
 // 서버에서 Notion 데이터를 가져오는 API 클라이언트
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Vercel에서는 같은 도메인이므로 빈 문자열, 로컬에서는 localhost:3001
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // 공통 fetch 래퍼
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
