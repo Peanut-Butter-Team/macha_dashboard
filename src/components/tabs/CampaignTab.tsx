@@ -654,34 +654,55 @@ function CampaignPerformance({
       return { likes: [], views: [], engagement: [] };
     }
 
-    const now = new Date();
+    // 실제 데이터의 날짜 범위 찾기
+    const contentDates = contents
+      .filter(c => c.postedAt)
+      .map(c => new Date(c.postedAt!))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    if (contentDates.length === 0) {
+      return { likes: [], views: [], engagement: [] };
+    }
+
+    const earliestDate = contentDates[0];
+    const latestDate = contentDates[contentDates.length - 1];
+
     let startDate: Date;
-    let endDate: Date = now;
+    let endDate: Date;
 
     // 기간별 시작/종료일 계산
     switch (periodFilter) {
       case 'daily':
-        // 최근 7일
-        startDate = new Date(now);
+        // 최근 데이터부터 7일
+        endDate = latestDate;
+        startDate = new Date(endDate);
         startDate.setDate(startDate.getDate() - 7);
+        // 데이터 시작일보다 이전이면 데이터 시작일로 조정
+        if (startDate < earliestDate) startDate = earliestDate;
         break;
       case 'weekly':
-        // 최근 4주
-        startDate = new Date(now);
+        // 최근 데이터부터 4주
+        endDate = latestDate;
+        startDate = new Date(endDate);
         startDate.setDate(startDate.getDate() - 28);
+        if (startDate < earliestDate) startDate = earliestDate;
         break;
       case 'monthly':
-        // 최근 3개월
-        startDate = new Date(now);
+        // 최근 데이터부터 3개월
+        endDate = latestDate;
+        startDate = new Date(endDate);
         startDate.setMonth(startDate.getMonth() - 3);
+        if (startDate < earliestDate) startDate = earliestDate;
         break;
       case 'custom':
         startDate = new Date(customDateRange.start);
         endDate = new Date(customDateRange.end);
         break;
       default:
-        startDate = new Date(now);
+        endDate = latestDate;
+        startDate = new Date(endDate);
         startDate.setDate(startDate.getDate() - 7);
+        if (startDate < earliestDate) startDate = earliestDate;
     }
 
     // 기간 내 콘텐츠 필터링
