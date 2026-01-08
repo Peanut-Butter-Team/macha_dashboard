@@ -143,104 +143,141 @@ export function InfluencersTab() {
         </div>
       </div>
 
-      {/* Influencers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredInfluencers.map((influencer) => (
-          <div
-            key={influencer.id}
-            className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow"
-          >
-            {/* Profile */}
-            <div className="flex items-start gap-4 mb-4">
-              {influencer.profileImage ? (
-                <img
-                  src={influencer.profileImage}
-                  alt={influencer.name}
-                  className="w-16 h-16 rounded-full object-cover bg-slate-100"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    target.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-              ) : null}
-              <div
-                className={`w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xl font-bold ${influencer.profileImage ? 'hidden' : ''}`}
-              >
-                {influencer.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-primary-950 truncate">{influencer.name}</h3>
-                <div className="flex items-center gap-1 text-sm text-slate-500">
-                  <Instagram size={14} />
-                  <span className="truncate">@{influencer.handle}</span>
-                </div>
-                {influencer.status && (
-                  <span className="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">
-                    {influencer.status}
-                  </span>
-                )}
-              </div>
-            </div>
+      {/* Influencers Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  인플루언서
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  카테고리
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  팔로워
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  참여율
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  평균 좋아요
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  평균 댓글
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  연락처
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  상태
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredInfluencers.map((influencer) => (
+                <tr key={influencer.id} className="hover:bg-slate-50 transition-colors">
+                  {/* 인플루언서 */}
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {influencer.profileImage ? (
+                        <img
+                          src={influencer.profileImage}
+                          alt={influencer.name}
+                          className="w-10 h-10 rounded-full object-cover bg-slate-100"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-bold ${influencer.profileImage ? 'hidden' : ''}`}
+                      >
+                        {influencer.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-primary-950 truncate">{influencer.name}</div>
+                        <div className="flex items-center gap-1 text-sm text-slate-500">
+                          <Instagram size={12} />
+                          <span className="truncate">@{influencer.handle}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
 
-            {/* Categories */}
-            {influencer.category.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-4">
-                {influencer.category.map((cat, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded"
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            )}
+                  {/* 카테고리 */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1">
+                      {influencer.category.slice(0, 2).map((cat, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded"
+                        >
+                          {cat}
+                        </span>
+                      ))}
+                      {influencer.category.length > 2 && (
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">
+                          +{influencer.category.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  </td>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-3 mb-4 pb-4 border-b border-slate-100">
-              <div>
-                <div className="text-xs text-slate-500">팔로워</div>
-                <div className="text-lg font-bold text-primary-950">{formatNumber(influencer.followers)}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">참여율</div>
-                <div className="text-lg font-bold text-primary-950">{influencer.engagementRate.toFixed(1)}%</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">평균 좋아요</div>
-                <div className="text-sm font-semibold text-slate-700">{formatNumber(influencer.avgLikes)}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">평균 댓글</div>
-                <div className="text-sm font-semibold text-slate-700">{formatNumber(influencer.avgComments)}</div>
-              </div>
-            </div>
+                  {/* 팔로워 */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="font-semibold text-primary-950">{formatNumber(influencer.followers)}</div>
+                  </td>
 
-            {/* Contact */}
-            <div className="space-y-2">
-              {influencer.email && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Mail size={14} className="text-slate-400" />
-                  <span className="truncate">{influencer.email}</span>
-                </div>
-              )}
-              {influencer.phone && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Phone size={14} className="text-slate-400" />
-                  <span>{influencer.phone}</span>
-                </div>
-              )}
-            </div>
+                  {/* 참여율 */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="font-semibold text-primary-950">{influencer.engagementRate.toFixed(1)}%</div>
+                  </td>
 
-            {/* Notes */}
-            {influencer.notes && (
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-xs text-slate-500 line-clamp-2">{influencer.notes}</p>
-              </div>
-            )}
-          </div>
-        ))}
+                  {/* 평균 좋아요 */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="text-slate-700">{formatNumber(influencer.avgLikes)}</div>
+                  </td>
+
+                  {/* 평균 댓글 */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="text-slate-700">{formatNumber(influencer.avgComments)}</div>
+                  </td>
+
+                  {/* 연락처 */}
+                  <td className="px-6 py-4">
+                    <div className="space-y-1 text-sm">
+                      {influencer.email && (
+                        <div className="flex items-center gap-1 text-slate-600">
+                          <Mail size={12} className="text-slate-400 flex-shrink-0" />
+                          <span className="truncate max-w-[150px]">{influencer.email}</span>
+                        </div>
+                      )}
+                      {influencer.phone && (
+                        <div className="flex items-center gap-1 text-slate-600">
+                          <Phone size={12} className="text-slate-400 flex-shrink-0" />
+                          <span>{influencer.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* 상태 */}
+                  <td className="px-6 py-4">
+                    {influencer.status && (
+                      <span className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">
+                        {influencer.status}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Empty State */}
