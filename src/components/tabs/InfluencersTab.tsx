@@ -110,6 +110,34 @@ export function InfluencersTab() {
               <p className="text-sm text-slate-500">총 {influencers.length}명</p>
             </div>
           </div>
+          <button
+            onClick={() => {
+              const url =
+                'https://www.facebook.com/v24.0/dialog/oauth' +
+                '?client_id=742315354931014' +
+                '&redirect_uri=https://matcha.pnutbutter.kr/api-meta/auth/callback' +
+                '&scope=' +
+                [
+                  'public_profile',
+                  'pages_show_list',
+                  'pages_read_engagement',
+                  'instagram_basic',
+                  'instagram_manage_insights',
+                  'business_management',
+                  'ads_read',
+                  'ads_management',
+                ].join(',') +
+                '&response_type=code';
+              window.location.href = url;
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white text-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #f58529, #dd2a7b, #8134af)',
+            }}
+          >
+            <Instagram size={18} />
+            Instagram 계정 연결
+          </button>
         </div>
 
         {/* Search and Filter */}
