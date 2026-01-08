@@ -14,12 +14,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await notion.databases.query({
-      database_id: INFLUENCER_DB_ID,
-      page_size: 100,
-    });
+    // 모든 페이지 데이터 가져오기 (페이지네이션)
+    let allResults = [];
+    let hasMore = true;
+    let startCursor = undefined;
 
-    const influencers = response.results.map((page) => {
+    while (hasMore) {
+      const response = await notion.databases.query({
+        database_id: INFLUENCER_DB_ID,
+        page_size: 100,
+        start_cursor: startCursor,
+      });
+
+      allResults = allResults.concat(response.results);
+      hasMore = response.has_more;
+      startCursor = response.next_cursor;
+    }
+
+    const influencers = allResults.map((page) => {
       const props = page.properties;
 
       // 팔로워 수 파싱 (rich_text에서 숫자 추출)
