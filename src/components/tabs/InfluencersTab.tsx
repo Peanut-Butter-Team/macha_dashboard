@@ -147,45 +147,48 @@ export function InfluencersTab() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
+            <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wide">
                   인플루언서
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wide">
                   카테고리
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wide">
                   팔로워
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wide">
                   참여율
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wide">
                   평균 좋아요
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wide">
                   평균 댓글
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wide">
                   연락처
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wide">
                   상태
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredInfluencers.map((influencer) => (
-                <tr key={influencer.id} className="hover:bg-slate-50 transition-colors">
+              {filteredInfluencers.map((influencer, index) => (
+                <tr
+                  key={influencer.id}
+                  className={`hover:bg-primary-50 transition-all duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
+                >
                   {/* 인플루언서 */}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-4">
                       {influencer.profileImage ? (
                         <img
                           src={influencer.profileImage}
                           alt={influencer.name}
-                          className="w-10 h-10 rounded-full object-cover bg-slate-100"
+                          className="w-12 h-12 rounded-full object-cover bg-slate-100 ring-2 ring-slate-200"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = 'none';
@@ -194,83 +197,98 @@ export function InfluencersTab() {
                         />
                       ) : null}
                       <div
-                        className={`w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-bold ${influencer.profileImage ? 'hidden' : ''}`}
+                        className={`w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white text-base font-bold ring-2 ring-primary-200 ${influencer.profileImage ? 'hidden' : ''}`}
                       >
                         {influencer.name.charAt(0).toUpperCase()}
                       </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-primary-950 truncate">{influencer.name}</div>
-                        <div className="flex items-center gap-1 text-sm text-slate-500">
-                          <Instagram size={12} />
-                          <span className="truncate">@{influencer.handle}</span>
-                        </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-primary-950 text-base mb-0.5">{influencer.name}</div>
+                        {influencer.handle && (
+                          <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                            <Instagram size={13} className="text-primary-400" />
+                            <span className="truncate">@{influencer.handle}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
 
                   {/* 카테고리 */}
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {influencer.category.slice(0, 2).map((cat, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded"
-                        >
-                          {cat}
-                        </span>
-                      ))}
-                      {influencer.category.length > 2 && (
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">
-                          +{influencer.category.length - 2}
-                        </span>
+                  <td className="px-6 py-5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {influencer.category.length > 0 ? (
+                        <>
+                          {influencer.category.slice(0, 2).map((cat, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2.5 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded-md"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                          {influencer.category.length > 2 && (
+                            <span className="px-2.5 py-1 bg-slate-200 text-slate-700 text-xs font-medium rounded-md">
+                              +{influencer.category.length - 2}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400 text-sm">-</span>
                       )}
                     </div>
                   </td>
 
                   {/* 팔로워 */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="font-semibold text-primary-950">{formatNumber(influencer.followers)}</div>
+                  <td className="px-6 py-5 text-center">
+                    <div className="font-bold text-primary-950 text-base">{formatNumber(influencer.followers)}</div>
                   </td>
 
                   {/* 참여율 */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="font-semibold text-primary-950">{influencer.engagementRate.toFixed(1)}%</div>
+                  <td className="px-6 py-5 text-center">
+                    <div className="inline-flex items-center px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold text-sm rounded-lg">
+                      {influencer.engagementRate.toFixed(1)}%
+                    </div>
                   </td>
 
                   {/* 평균 좋아요 */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="text-slate-700">{formatNumber(influencer.avgLikes)}</div>
+                  <td className="px-6 py-5 text-center">
+                    <div className="font-semibold text-slate-700">{formatNumber(influencer.avgLikes)}</div>
                   </td>
 
                   {/* 평균 댓글 */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="text-slate-700">{formatNumber(influencer.avgComments)}</div>
+                  <td className="px-6 py-5 text-center">
+                    <div className="font-semibold text-slate-700">{formatNumber(influencer.avgComments)}</div>
                   </td>
 
                   {/* 연락처 */}
-                  <td className="px-6 py-4">
-                    <div className="space-y-1 text-sm">
-                      {influencer.email && (
-                        <div className="flex items-center gap-1 text-slate-600">
-                          <Mail size={12} className="text-slate-400 flex-shrink-0" />
-                          <span className="truncate max-w-[150px]">{influencer.email}</span>
+                  <td className="px-6 py-5">
+                    <div className="space-y-1.5">
+                      {influencer.email ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <Mail size={14} className="text-slate-400 flex-shrink-0" />
+                          <span className="truncate max-w-[180px]">{influencer.email}</span>
                         </div>
-                      )}
-                      {influencer.phone && (
-                        <div className="flex items-center gap-1 text-slate-600">
-                          <Phone size={12} className="text-slate-400 flex-shrink-0" />
+                      ) : null}
+                      {influencer.phone ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <Phone size={14} className="text-slate-400 flex-shrink-0" />
                           <span>{influencer.phone}</span>
                         </div>
+                      ) : null}
+                      {!influencer.email && !influencer.phone && (
+                        <span className="text-slate-400 text-sm">-</span>
                       )}
                     </div>
                   </td>
 
                   {/* 상태 */}
-                  <td className="px-6 py-4">
-                    {influencer.status && (
-                      <span className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">
+                  <td className="px-6 py-5 text-center">
+                    {influencer.status ? (
+                      <span className="inline-flex items-center px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
                         {influencer.status}
                       </span>
+                    ) : (
+                      <span className="text-slate-400 text-sm">-</span>
                     )}
                   </td>
                 </tr>
