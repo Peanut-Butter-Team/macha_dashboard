@@ -44,9 +44,9 @@ export default async function handler(req, res) {
       const followersText = props['팔로워 수']?.rich_text?.[0]?.plain_text || '0';
       const followers = parseInt(followersText.replace(/,/g, '')) || 0;
 
-      // 인스타그램 핸들 추출 (@ 제거)
-      const instagramProfile = props['인스타그램 프로필']?.rich_text?.[0]?.plain_text || '';
-      const handle = instagramProfile.replace('@', '').trim();
+      // 인스타그램 핸들 추출 (username formula 필드 사용)
+      const username = props['username']?.formula?.string || '';
+      const handle = username.replace('@', '').trim();
 
       // 이메일 추출
       const email = props['이메일']?.rich_text?.[0]?.plain_text || '';
