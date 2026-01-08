@@ -24,6 +24,12 @@ export default async function handler(req, res) {
         database_id: INFLUENCER_DB_ID,
         page_size: 100,
         start_cursor: startCursor,
+        sorts: [
+          {
+            timestamp: 'last_edited_time',
+            direction: 'descending'
+          }
+        ]
       });
 
       allResults = allResults.concat(response.results);
