@@ -22,22 +22,39 @@ export default async function handler(req, res) {
     const influencers = response.results.map((page) => {
       const props = page.properties;
 
+      // 팔로워 수 파싱 (rich_text에서 숫자 추출)
+      const followersText = props['팔로워 수']?.rich_text?.[0]?.plain_text || '0';
+      const followers = parseInt(followersText.replace(/,/g, '')) || 0;
+
+      // 인스타그램 핸들 추출 (@ 제거)
+      const instagramProfile = props['인스타그램 프로필']?.rich_text?.[0]?.plain_text || '';
+      const handle = instagramProfile.replace('@', '').trim();
+
+      // 이메일 추출
+      const email = props['이메일']?.rich_text?.[0]?.plain_text || '';
+
+      // 참여율 계산 (임시로 팔로워 기반 예상값)
+      const engagementRate = followers > 0 ? Math.min(5, (10000 / followers) * 2) : 0;
+
+      // 평균 좋아요/댓글 계산 (임시로 팔로워 기반 예상값)
+      const avgLikes = Math.round(followers * (engagementRate / 100));
+      const avgComments = Math.round(avgLikes * 0.1);
+
       return {
         id: page.id,
-        name: props['이름']?.title?.[0]?.plain_text || props['Name']?.title?.[0]?.plain_text || '',
-        handle: props['핸들']?.rich_text?.[0]?.plain_text || props['Handle']?.rich_text?.[0]?.plain_text || '',
-        platform: props['플랫폼']?.select?.name || props['Platform']?.select?.name || 'instagram',
-        category: props['카테고리']?.multi_select?.map(s => s.name) || props['Category']?.multi_select?.map(s => s.name) || [],
-        followers: props['팔로워']?.number || props['Followers']?.number || 0,
-        engagementRate: props['참여율']?.number || props['Engagement Rate']?.number || 0,
-        avgLikes: props['평균 좋아요']?.number || props['Avg Likes']?.number || 0,
-        avgComments: props['평균 댓글']?.number || props['Avg Comments']?.number || 0,
-        email: props['이메일']?.email || props['Email']?.email || '',
-        phone: props['전화번호']?.phone_number || props['Phone']?.phone_number || '',
-        notes: props['비고']?.rich_text?.[0]?.plain_text || props['Notes']?.rich_text?.[0]?.plain_text || '',
-        status: props['상태']?.select?.name || props['Status']?.select?.name || '',
-        profileImage: props['프로필 이미지']?.files?.[0]?.file?.url || props['프로필 이미지']?.files?.[0]?.external?.url ||
-                      props['Profile Image']?.files?.[0]?.file?.url || props['Profile Image']?.files?.[0]?.external?.url || '',
+        name: props['이름']?.title?.[0]?.plain_text || '',
+        handle: handle,
+        platform: 'instagram',
+        category: props['활동 분야']?.multi_select?.map(s => s.name) || [],
+        followers: followers,
+        engagementRate: parseFloat(engagementRate.toFixed(1)),
+        avgLikes: avgLikes,
+        avgComments: avgComments,
+        email: email,
+        phone: props['연락처']?.phone_number || '',
+        notes: props['희망 보상']?.multi_select?.map(s => s.name).join(', ') || '',
+        status: props['상태']?.status?.name || '',
+        profileImage: '',
         createdAt: page.created_time,
         lastModified: page.last_edited_time,
       };
