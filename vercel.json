@@ -47,6 +47,10 @@
       "dest": "/api/influencers-list.js"
     },
     {
+      "src": "/api/sync-instagram-data",
+      "dest": "/api/sync-instagram-data.js"
+    },
+    {
       "src": "/assets/(.*)",
       "dest": "/dist/assets/$1"
     },

@@ -51,12 +51,23 @@ export default async function handler(req, res) {
       // 이메일 추출
       const email = props['이메일']?.rich_text?.[0]?.plain_text || '';
 
-      // 참여율 계산 (임시로 팔로워 기반 예상값)
-      const engagementRate = followers > 0 ? Math.min(5, (10000 / followers) * 2) : 0;
+      // 실제 참여율 (Notion DB에서 가져오기, 없으면 계산)
+      let engagementRate = props['참여율']?.number || 0;
+      if (engagementRate === 0 && followers > 0) {
+        engagementRate = Math.min(5, (10000 / followers) * 2);
+      }
 
-      // 평균 좋아요/댓글 계산 (임시로 팔로워 기반 예상값)
-      const avgLikes = Math.round(followers * (engagementRate / 100));
-      const avgComments = Math.round(avgLikes * 0.1);
+      // 실제 평균 좋아요/댓글 (Notion DB에서 가져오기, 없으면 계산)
+      let avgLikes = props['평균 좋아요']?.number || 0;
+      let avgComments = props['평균 댓글']?.number || 0;
+
+      if (avgLikes === 0 && followers > 0) {
+        avgLikes = Math.round(followers * (engagementRate / 100));
+        avgComments = Math.round(avgLikes * 0.1);
+      }
+
+      // 프로필 이미지 URL
+      const profileImage = props['프로필 이미지 URL']?.url || '';
 
       return {
         id: page.id,
@@ -72,7 +83,7 @@ export default async function handler(req, res) {
         phone: props['연락처']?.phone_number || '',
         notes: props['희망 보상']?.multi_select?.map(s => s.name).join(', ') || '',
         status: props['상태']?.status?.name || '',
-        profileImage: '',
+        profileImage: profileImage,
         createdAt: page.created_time,
         lastModified: page.last_edited_time,
       };
