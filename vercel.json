@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/*.js",
+      "src": "api/**/*.js",
       "use": "@vercel/node"
     },
     {
@@ -26,6 +26,10 @@
     {
       "source": "/robots.txt",
       "destination": "https://proxy.inblog.dev/pnutbtr/robots.txt"
+    },
+    {
+      "source": "/api/auth/login",
+      "destination": "/api/auth/login.js"
     },
     {
       "source": "/api/campaigns",
