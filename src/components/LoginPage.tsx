@@ -98,14 +98,6 @@ export function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Account Info */}
-          <div className="mt-6 p-4 bg-slate-50 rounded-xl">
-            <p className="text-xs font-medium text-slate-500 mb-2">테스트 계정</p>
-            <div className="space-y-1 text-xs text-slate-600">
-              <p><span className="font-medium">스웻이프:</span> sweatlife@test.com / 1234</p>
-              <p><span className="font-medium">브랜드B:</span> brandB@test.com / 1234</p>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
