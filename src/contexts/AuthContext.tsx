@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
 
-      if (data.responseCode === 0 && data.result?.length > 0) {
+      if (data.responseCode === 200 && data.result?.length > 0) {
         const apiUser = data.result[0];
         const user: User = {
           id: apiUser.id,
