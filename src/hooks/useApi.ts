@@ -9,6 +9,8 @@ import type {
   AffiliateLink,
   ContentItem,
   AIAnalysis,
+  FollowerDemographic,
+  ProfileContentItem,
 } from '../types';
 import {
   PROFILE_INSIGHT,
@@ -21,6 +23,19 @@ import {
   CONTENT_LIST,
   AI_ANALYSIS,
 } from '../data/dummyData';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  fetchDashMemberInsight,
+  fetchDashFollowers,
+  fetchDashFollowerInsight,
+  fetchDashMedias,
+} from '../services/metaDashApi';
+import {
+  mapToProfileInsight,
+  mapToDailyProfileData,
+  mapToFollowerDemographic,
+  mapToContentItems,
+} from '../utils/metaDashMapper';
 
 // ============================================
 // API 호출 구조 - 실제 연동 시 이 함수들을 수정하세요
@@ -59,28 +74,46 @@ async function fetchFromApi<T>(_endpoint: string): Promise<T> {
 }
 
 // ============================================
-// 프로필 인사이트 (Instagram Graph API)
+// 프로필 인사이트 (Meta Dash API)
 // ============================================
 export function useProfileInsight(): ApiResponse<ProfileInsight> {
+  const { user } = useAuth();
   const [data, setData] = useState<ProfileInsight | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      setData(PROFILE_INSIGHT);
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const result = await fetchFromApi<ProfileInsight>('/instagram/insights');
-      setData(result);
-    } catch {
-      // API 실패 시 더미 데이터 사용
+      // Meta Dash API 호출
+      const [insights, followers] = await Promise.all([
+        fetchDashMemberInsight(user.id),
+        fetchDashFollowers(user.id),
+      ]);
+
+      // 데이터 변환
+      const profileData = mapToProfileInsight(insights, followers);
+      setData(profileData);
+      setError(null);
+    } catch (err) {
+      console.error('프로필 인사이트 조회 실패:', err);
+      setError(err instanceof Error ? err.message : '데이터를 불러올 수 없습니다');
+      // 폴백: 더미 데이터
       setData(PROFILE_INSIGHT);
     } finally {
       setLoading(false);
       setLastUpdated(new Date());
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchData();
@@ -90,27 +123,45 @@ export function useProfileInsight(): ApiResponse<ProfileInsight> {
 }
 
 // ============================================
-// 일별 프로필 데이터 (Instagram Graph API)
+// 일별 프로필 데이터 (Meta Dash API)
 // ============================================
 export function useDailyProfileData(period: string): ApiResponse<DailyProfileData[]> {
+  const { user } = useAuth();
   const [data, setData] = useState<DailyProfileData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      setData(DAILY_PROFILE_DATA);
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const result = await fetchFromApi<DailyProfileData[]>(`/instagram/daily?period=${period}`);
-      setData(result);
-    } catch {
+      // Meta Dash API 호출
+      const [followers, insights] = await Promise.all([
+        fetchDashFollowers(user.id),
+        fetchDashMemberInsight(user.id),
+      ]);
+
+      // 데이터 변환
+      const dailyData = mapToDailyProfileData(followers, insights);
+      setData(dailyData);
+      setError(null);
+    } catch (err) {
+      console.error('일별 프로필 데이터 조회 실패:', err);
+      setError(err instanceof Error ? err.message : '데이터를 불러올 수 없습니다');
       setData(DAILY_PROFILE_DATA);
     } finally {
       setLoading(false);
       setLastUpdated(new Date());
     }
-  }, [period]);
+  }, [user?.id, period]);
 
   useEffect(() => {
     fetchData();
@@ -321,6 +372,90 @@ export function useAIAnalysis(): ApiResponse<AIAnalysis> {
       setLastUpdated(new Date());
     }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData, lastUpdated };
+}
+
+// ============================================
+// 팔로워 분석 (Meta Dash API) - 신규
+// ============================================
+export function useFollowerDemographic(): ApiResponse<FollowerDemographic> {
+  const { user } = useAuth();
+  const [data, setData] = useState<FollowerDemographic | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const insights = await fetchDashFollowerInsight(user.id);
+      const demographic = mapToFollowerDemographic(insights);
+      setData(demographic);
+      setError(null);
+    } catch (err) {
+      console.error('팔로워 분석 조회 실패:', err);
+      setError(err instanceof Error ? err.message : '데이터를 불러올 수 없습니다');
+      setData(null);
+    } finally {
+      setLoading(false);
+      setLastUpdated(new Date());
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData, lastUpdated };
+}
+
+// ============================================
+// 프로필 콘텐츠 (Meta Dash API) - 신규
+// ============================================
+export function useProfileContent(): ApiResponse<ProfileContentItem[]> {
+  const { user } = useAuth();
+  const [data, setData] = useState<ProfileContentItem[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      setData([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const mediaList = await fetchDashMedias(user.id);
+      const contents = mapToContentItems(mediaList);
+      setData(contents);
+      setError(null);
+    } catch (err) {
+      console.error('프로필 콘텐츠 조회 실패:', err);
+      setError(err instanceof Error ? err.message : '데이터를 불러올 수 없습니다');
+      setData([]);
+    } finally {
+      setLoading(false);
+      setLastUpdated(new Date());
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     fetchData();

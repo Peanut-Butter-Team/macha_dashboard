@@ -27,7 +27,10 @@ import {
   useAffiliateLinks,
   useContentList,
   useAIAnalysis,
+  useFollowerDemographic,
+  useProfileContent,
 } from './hooks/useApi';
+import { syncDashMember } from './services/metaDashApi';
 
 // 탭 타입
 type TabType = 'profile' | 'ads' | 'campaign' | 'influencers';
@@ -87,10 +90,29 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
   const { data: contentList, loading: contentLoading, refetch: refetchContent } = useContentList();
   const { data: aiAnalysis, loading: aiLoading, refetch: refetchAI } = useAIAnalysis();
 
-  // 전체 새로고침
-  const handleRefreshAll = useCallback(() => {
+  // 신규 hooks (Meta Dash API)
+  const { data: followerDemographic, loading: followerDemographicLoading, refetch: refetchFollowerDemographic } = useFollowerDemographic();
+  const { data: profileContent, loading: profileContentLoading, refetch: refetchProfileContent } = useProfileContent();
+
+  // 전체 새로고침 (sync API 포함)
+  const handleRefreshAll = useCallback(async () => {
+    console.log('데이터 동기화 시작...');
+
+    // 1. Sync API 호출 (금일 데이터 갱신)
+    if (user?.id) {
+      try {
+        const syncResult = await syncDashMember(user.id);
+        console.log('동기화 결과:', syncResult);
+      } catch (error) {
+        console.error('동기화 실패:', error);
+      }
+    }
+
+    // 2. 모든 데이터 새로고침
     refetchProfile();
     refetchDailyProfile();
+    refetchFollowerDemographic();
+    refetchProfileContent();
     refetchAd();
     refetchDailyAd();
     refetchInfluencers();
@@ -98,7 +120,9 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
     refetchAffiliate();
     refetchContent();
     refetchAI();
-  }, [refetchProfile, refetchDailyProfile, refetchAd, refetchDailyAd, refetchInfluencers, refetchSeeding, refetchAffiliate, refetchContent, refetchAI]);
+
+    console.log('전체 데이터 새로고침 완료');
+  }, [user?.id, refetchProfile, refetchDailyProfile, refetchFollowerDemographic, refetchProfileContent, refetchAd, refetchDailyAd, refetchInfluencers, refetchSeeding, refetchAffiliate, refetchContent, refetchAI]);
 
   // 탭 설정
   const tabs: { key: TabType; label: string; icon: typeof User }[] = [
@@ -110,7 +134,7 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
 
   // 로딩 상태 계산
   const isLoading = {
-    profile: profileLoading || dailyProfileLoading,
+    profile: profileLoading || dailyProfileLoading || followerDemographicLoading || profileContentLoading,
     ads: adLoading || dailyAdLoading,
     campaign: influencersLoading || seedingLoading || affiliateLoading || contentLoading || aiLoading,
   };
@@ -243,6 +267,8 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
           <ProfileTab
             profileData={profileData}
             dailyData={dailyProfileData}
+            followerDemographic={followerDemographic}
+            contentData={profileContent}
             loading={isLoading.profile}
           />
         )}

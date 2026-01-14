@@ -144,3 +144,41 @@ export interface MetricDefinition {
   title: string;
   description: string;
 }
+
+// 팔로워 인구통계 (API 연동용)
+export interface FollowerDemographic {
+  gender: {
+    male: number;
+    female: number;
+    malePercent: number;
+    femalePercent: number;
+  };
+  age: {
+    range: string;
+    count: number;
+    percent: number;
+  }[];
+  country: {
+    code: string;
+    name: string;
+    count: number;
+    percent: number;
+  }[];
+  total: number;
+}
+
+// 프로필 콘텐츠 아이템 (API 연동용)
+export interface ProfileContentItem {
+  id: string;
+  type: 'reels' | 'feed' | 'story' | 'carousel';
+  uploadDate: string;
+  thumbnailUrl?: string;
+  views?: number;
+  reach: number;
+  impressions: number;
+  likes: number;
+  comments: number;
+  saves: number;
+  shares?: number;
+  engagementRate: number;
+}

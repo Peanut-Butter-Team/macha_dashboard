@@ -12,11 +12,13 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Play, Image, Sparkles } from 'lucide-react';
 import { InfoTooltip } from '../common/InfoTooltip';
-import type { ProfileInsight, DailyProfileData } from '../../types';
+import type { ProfileInsight, DailyProfileData, FollowerDemographic, ProfileContentItem } from '../../types';
 
 interface ProfileTabProps {
   profileData: ProfileInsight | null;
   dailyData: DailyProfileData[] | null;
+  followerDemographic: FollowerDemographic | null;
+  contentData: ProfileContentItem[] | null;
   loading: boolean;
 }
 
@@ -24,21 +26,6 @@ const formatNumber = (num: number): string => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toLocaleString();
-};
-
-// 스토리 성과 더미 데이터
-const storyPerformanceData = [
-  { date: '2024-12-14', stories: 5, views: 8234, linkClicks: 342 },
-  { date: '2024-12-13', stories: 3, views: 6890, linkClicks: 289 },
-  { date: '2024-12-12', stories: 4, views: 7456, linkClicks: 312 },
-  { date: '2024-12-11', stories: 6, views: 9123, linkClicks: 398 },
-  { date: '2024-12-10', stories: 4, views: 7234, linkClicks: 276 },
-];
-
-const storyStats = {
-  avgViews: 7787,
-  reach: 6234,
-  linkClicks: 1617,
 };
 
 // 프로필 AI 분석 데이터
@@ -61,7 +48,7 @@ const profileActions = {
 };
 
 // 콘텐츠 성과 더미 데이터
-type ContentType = 'reels' | 'feed' | 'story';
+type ContentType = 'reels' | 'feed' | 'carousel';
 
 interface ContentItem {
   id: string;
@@ -128,15 +115,37 @@ function ProfileKPICard({
   );
 }
 
-export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps) {
+export function ProfileTab({ profileData, dailyData, followerDemographic, contentData, loading }: ProfileTabProps) {
   const [contentFilter, setContentFilter] = useState<'all' | ContentType>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // API 데이터가 없으면 더미 데이터 사용
+  const contentList = contentData && contentData.length > 0 ? contentData : contentPerformanceData;
 
   const filteredContent = contentFilter === 'all'
-    ? contentPerformanceData
-    : contentPerformanceData.filter(item => item.type === contentFilter);
+    ? contentList
+    : contentList.filter(item => item.type === contentFilter);
 
   // 참여율 높은 순으로 정렬
   const sortedContent = [...filteredContent].sort((a, b) => b.engagementRate - a.engagementRate);
+
+  // 페이지네이션 계산
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(sortedContent.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedContent = sortedContent.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // 필터 변경 핸들러
+  const handleFilterChange = (filter: 'all' | ContentType) => {
+    setContentFilter(filter);
+    setCurrentPage(1);
+  };
+
+  // 프로필 행동 데이터 (API 데이터 우선 사용)
+  const profileActionsData = {
+    profileVisits: profileData?.profileViews || profileActions.profileVisits,
+    websiteClicks: profileData?.websiteClicks || profileActions.websiteClicks,
+  };
 
   if (!profileData) {
     return (
@@ -195,7 +204,7 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
             <span className="text-xs text-slate-500">프로필 방문</span>
             <InfoTooltip metricKey="profileVisits" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">{profileActions.profileVisits.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-slate-900">{profileActionsData.profileVisits.toLocaleString()}</div>
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
             <TrendingUp size={12} />
             <span>전월 대비 +12.5%</span>
@@ -206,7 +215,7 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
             <span className="text-xs text-slate-500">웹사이트 클릭</span>
             <InfoTooltip metricKey="websiteClicks" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">{profileActions.websiteClicks.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-slate-900">{profileActionsData.websiteClicks.toLocaleString()}</div>
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
             <TrendingUp size={12} />
             <span>전월 대비 +8.3%</span>
@@ -218,7 +227,7 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
             <InfoTooltip metricKey="clickRate" />
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {((profileActions.websiteClicks / profileActions.profileVisits) * 100).toFixed(1)}%
+            {profileActionsData.profileVisits > 0 ? ((profileActionsData.websiteClicks / profileActionsData.profileVisits) * 100).toFixed(1) : 0}%
           </div>
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
             <TrendingUp size={12} />
@@ -324,6 +333,88 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
         </section>
       </div>
 
+      {/* 3.5 팔로워 분석 (성별, 나이, 지역) */}
+      {followerDemographic && (
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-primary-950 mb-6">팔로워 분석</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 성별 분포 */}
+            <div>
+              <h4 className="text-sm font-medium text-slate-700 mb-3">성별</h4>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-slate-600">남성</span>
+                    <span className="text-sm font-medium">{followerDemographic.gender.malePercent}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full"
+                      style={{ width: `${followerDemographic.gender.malePercent}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-slate-600">여성</span>
+                    <span className="text-sm font-medium">{followerDemographic.gender.femalePercent}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-pink-500 rounded-full"
+                      style={{ width: `${followerDemographic.gender.femalePercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 나이대 분포 */}
+            <div>
+              <h4 className="text-sm font-medium text-slate-700 mb-3">나이대</h4>
+              <div className="space-y-2">
+                {followerDemographic.age.slice(0, 5).map(item => (
+                  <div key={item.range} className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">{item.range}세</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-violet-500 rounded-full"
+                          style={{ width: `${item.percent}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium w-12 text-right">{item.percent}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 국가 분포 */}
+            <div>
+              <h4 className="text-sm font-medium text-slate-700 mb-3">국가</h4>
+              <div className="space-y-2">
+                {followerDemographic.country.slice(0, 5).map(item => (
+                  <div key={item.code} className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">{item.name}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full"
+                          style={{ width: `${item.percent}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium w-12 text-right">{item.percent}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 4. 콘텐츠 성과 */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -335,12 +426,12 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
               {[
                 { key: 'all', label: 'All' },
                 { key: 'reels', label: 'Reels' },
+                { key: 'carousel', label: 'Carousel' },
                 { key: 'feed', label: 'Feed' },
-                { key: 'story', label: 'Story' },
               ].map(({ key, label }) => (
                 <button
                   key={key}
-                  onClick={() => setContentFilter(key as 'all' | ContentType)}
+                  onClick={() => handleFilterChange(key as 'all' | ContentType)}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                     contentFilter === key
                       ? 'bg-white text-primary-950 shadow-sm'
@@ -377,11 +468,24 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
               </tr>
             </thead>
             <tbody>
-              {sortedContent.map((item, index) => (
-                <tr key={item.id} className={index < sortedContent.length - 1 ? 'border-b border-slate-100' : ''}>
+              {paginatedContent.map((item, index) => (
+                <tr key={item.id} className={index < paginatedContent.length - 1 ? 'border-b border-slate-100' : ''}>
                   {/* 썸네일 */}
                   <td className="py-4 px-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                    {'thumbnailUrl' in item && item.thumbnailUrl ? (
+                      <img
+                        src={item.thumbnailUrl}
+                        alt="썸네일"
+                        className="w-12 h-12 rounded-lg object-cover"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const fallback = target.nextElementSibling;
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center ${'thumbnailUrl' in item && item.thumbnailUrl ? 'hidden' : ''}`}>
                       {item.type === 'reels' ? (
                         <Play size={20} className="text-slate-400" />
                       ) : (
@@ -396,15 +500,17 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
                         ? 'bg-blue-100 text-blue-700'
                         : item.type === 'feed'
                         ? 'bg-slate-100 text-slate-700'
+                        : item.type === 'carousel'
+                        ? 'bg-green-100 text-green-700'
                         : 'bg-purple-100 text-purple-700'
                     }`}>
-                      {item.type === 'reels' ? 'Reels' : item.type === 'feed' ? 'Feed' : 'Story'}
+                      {item.type === 'reels' ? 'Reels' : item.type === 'feed' ? 'Feed' : item.type === 'carousel' ? 'Carousel' : 'Story'}
                     </span>
                   </td>
                   {/* 업로드 날짜 */}
                   <td className="py-4 px-4 text-sm text-slate-600">{item.uploadDate}</td>
                   {/* 조회수 */}
-                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.views.toLocaleString()}</td>
+                  <td className="py-4 px-4 text-sm text-slate-600 text-right">{(item.views || 0).toLocaleString()}</td>
                   {/* 도달 */}
                   <td className="py-4 px-4 text-sm text-slate-600 text-right">{item.reach.toLocaleString()}</td>
                   {/* 노출 */}
@@ -424,61 +530,44 @@ export function ProfileTab({ profileData, dailyData, loading }: ProfileTabProps)
             </tbody>
           </table>
         </div>
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-slate-100">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+            >
+              이전
+            </button>
+
+            {/* 페이지 번호 */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-8 h-8 text-sm rounded-lg ${
+                  currentPage === page
+                    ? 'bg-primary-950 text-white'
+                    : 'border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+            >
+              다음
+            </button>
+          </div>
+        )}
       </section>
 
-      {/* 5. 스토리 성과 (KPI + 테이블 통합) */}
-      <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-        <h3 className="text-lg font-semibold text-primary-950 mb-4">스토리 성과</h3>
-
-        {/* 스토리 KPI */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="p-4 border border-slate-200 rounded-xl text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-slate-500 mb-1">
-              평균 조회수
-              <InfoTooltip metricKey="storyViews" />
-            </div>
-            <div className="text-2xl font-bold text-primary-950">{storyStats.avgViews.toLocaleString()}</div>
-          </div>
-          <div className="p-4 border border-slate-200 rounded-xl text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-slate-500 mb-1">
-              스토리 도달
-              <InfoTooltip metricKey="storyReach" />
-            </div>
-            <div className="text-2xl font-bold text-primary-950">{storyStats.reach.toLocaleString()}</div>
-          </div>
-          <div className="p-4 border border-slate-200 rounded-xl text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-slate-500 mb-1">
-              링크 클릭
-              <InfoTooltip metricKey="linkClicks" />
-            </div>
-            <div className="text-2xl font-bold text-primary-950">{storyStats.linkClicks.toLocaleString()}</div>
-          </div>
-        </div>
-
-        {/* 스토리 일별 테이블 */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">날짜</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">스토리 수</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">총 조회수</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-slate-500">링크 클릭</th>
-              </tr>
-            </thead>
-            <tbody>
-              {storyPerformanceData.map((item, index) => (
-                <tr key={item.date} className={index < storyPerformanceData.length - 1 ? 'border-b border-slate-100' : ''}>
-                  <td className="py-4 px-4 text-sm text-slate-700">{item.date}</td>
-                  <td className="py-4 px-4 text-sm text-slate-600 text-center">{item.stories}</td>
-                  <td className="py-4 px-4 text-sm text-slate-600 text-center">{item.views.toLocaleString()}</td>
-                  <td className="py-4 px-4 text-sm text-slate-600 text-center">{item.linkClicks}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
         </div>
 
         {/* 오른쪽 AI 분석 사이드바 */}
