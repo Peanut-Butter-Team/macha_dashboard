@@ -75,6 +75,7 @@ export interface CampaignPerformance {
   ctr: number;
   cpc: number;
   status: 'active' | 'paused' | 'completed';
+  startDate: string; // 최초 기록일 (YYYY-MM-DD)
 }
 
 // 캠페인 데이터 (Notion/DB)

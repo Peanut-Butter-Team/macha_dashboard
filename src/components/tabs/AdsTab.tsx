@@ -168,8 +168,14 @@ export function AdsTab({ adData, dailyData, campaignData, profileData, loading }
   // 캠페인 테이블 페이지네이션
   const [campaignPage, setCampaignPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
-  const totalPages = Math.ceil(campaignData.length / ITEMS_PER_PAGE);
-  const paginatedCampaigns = campaignData.slice(
+
+  // 게시일 기준 정렬 (최신순)
+  const sortedCampaigns = [...campaignData].sort((a, b) =>
+    b.startDate.localeCompare(a.startDate)
+  );
+
+  const totalPages = Math.ceil(sortedCampaigns.length / ITEMS_PER_PAGE);
+  const paginatedCampaigns = sortedCampaigns.slice(
     (campaignPage - 1) * ITEMS_PER_PAGE,
     campaignPage * ITEMS_PER_PAGE
   );
@@ -193,8 +199,8 @@ export function AdsTab({ adData, dailyData, campaignData, profileData, loading }
   ];
 
   const engagementSourceData = [
-    { name: '유기적 참여', value: organicEngagementPercent, color: '#ec4899' },
-    { name: '광고 참여', value: adEngagementPercent, color: '#8b5cf6' },
+    { name: '광고 참여', value: adEngagementPercent, color: '#f59e0b' },
+    { name: '유기적 참여', value: organicEngagementPercent, color: '#6366f1' },
   ];
   if (!adData) {
     return (
@@ -307,7 +313,7 @@ export function AdsTab({ adData, dailyData, campaignData, profileData, loading }
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
             <span className="text-sm text-slate-500">
-              총 {campaignData.length}개 중 {(campaignPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(campaignPage * ITEMS_PER_PAGE, campaignData.length)}개 표시
+              총 {sortedCampaigns.length}개 중 {(campaignPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(campaignPage * ITEMS_PER_PAGE, sortedCampaigns.length)}개 표시
             </span>
             <div className="flex items-center gap-2">
               <button

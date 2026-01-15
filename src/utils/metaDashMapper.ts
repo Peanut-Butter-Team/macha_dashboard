@@ -488,6 +488,12 @@ export function mapToCampaignPerformance(
     const totalClicks = records.reduce((sum, r) => sum + r.insight.clicks, 0);
     const totalImpressions = records.reduce((sum, r) => sum + r.insight.impressions, 0);
 
+    // 최초 기록일 추출 (가장 빠른 time 값)
+    const earliestTime = records.reduce((min, r) =>
+      r.insight.time < min ? r.insight.time : min,
+      records[0].insight.time
+    );
+
     return {
       id: adId,
       name: detail.adName,
@@ -498,6 +504,7 @@ export function mapToCampaignPerformance(
       ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
       cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
       status: mapAdStatus(detail.status),
+      startDate: earliestTime,
     };
   });
 }
