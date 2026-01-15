@@ -165,8 +165,9 @@ function SourcePieChart({
 }
 
 export function AdsTab({ adData, dailyData, campaignData, profileData, loading }: AdsTabProps) {
-  // 캠페인 테이블 페이지네이션
+  // 캠페인 테이블 페이지네이션 및 필터
   const [campaignPage, setCampaignPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
   const ITEMS_PER_PAGE = 5;
 
   // 게시일 기준 정렬 (최신순)
@@ -174,8 +175,13 @@ export function AdsTab({ adData, dailyData, campaignData, profileData, loading }
     b.startDate.localeCompare(a.startDate)
   );
 
-  const totalPages = Math.ceil(sortedCampaigns.length / ITEMS_PER_PAGE);
-  const paginatedCampaigns = sortedCampaigns.slice(
+  // 상태별 필터링
+  const filteredCampaigns = statusFilter === 'all'
+    ? sortedCampaigns
+    : sortedCampaigns.filter(c => c.status === statusFilter);
+
+  const totalPages = Math.ceil(filteredCampaigns.length / ITEMS_PER_PAGE);
+  const paginatedCampaigns = filteredCampaigns.slice(
     (campaignPage - 1) * ITEMS_PER_PAGE,
     campaignPage * ITEMS_PER_PAGE
   );
@@ -269,6 +275,32 @@ export function AdsTab({ adData, dailyData, campaignData, profileData, loading }
       {/* 광고 캠페인별 성과 */}
       <section className="bg-white rounded-2xl border border-slate-200 p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-4">광고 캠페인별 성과</h3>
+
+        {/* 상태별 탭 필터 */}
+        <div className="flex gap-2 mb-4">
+          {[
+            { value: 'all', label: '전체' },
+            { value: 'active', label: '진행중' },
+            { value: 'paused', label: '일시정지' },
+            { value: 'completed', label: '완료' },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => {
+                setStatusFilter(tab.value as typeof statusFilter);
+                setCampaignPage(1);
+              }}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                statusFilter === tab.value
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -313,7 +345,7 @@ export function AdsTab({ adData, dailyData, campaignData, profileData, loading }
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
             <span className="text-sm text-slate-500">
-              총 {sortedCampaigns.length}개 중 {(campaignPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(campaignPage * ITEMS_PER_PAGE, sortedCampaigns.length)}개 표시
+              총 {filteredCampaigns.length}개 중 {(campaignPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(campaignPage * ITEMS_PER_PAGE, filteredCampaigns.length)}개 표시
             </span>
             <div className="flex items-center gap-2">
               <button
