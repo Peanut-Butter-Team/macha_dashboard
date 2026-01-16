@@ -21,20 +21,20 @@ const USE_NOTION = import.meta.env.VITE_USE_NOTION === 'true';
 // ============================================
 // 캠페인 목록 훅
 // ============================================
-export function useCampaigns() {
+export function useCampaigns(dashMemberId?: string) {
   const [campaigns, setCampaigns] = useState<NotionCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const load = useCallback(async () => {
-    if (!USE_NOTION) {
+    if (!dashMemberId) {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      const data = await fetchCampaigns();
+      const data = await fetchCampaigns(dashMemberId);
       setCampaigns(data);
       setError(null);
     } catch (err) {
@@ -43,13 +43,13 @@ export function useCampaigns() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dashMemberId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  return { campaigns, loading, error, refetch: load, isNotionEnabled: USE_NOTION };
+  return { campaigns, loading, error, refetch: load };
 }
 
 // ============================================
