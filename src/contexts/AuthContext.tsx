@@ -14,6 +14,7 @@ export interface User {
   email: string;
   name: string;
   igUserId?: string;
+  igUserNickName?: string;
   metaAccessToken?: string;
   brand?: Brand;
 }
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: apiUser.userId,
           name: apiUser.userId,
           igUserId: apiUser.igUserId,
+          igUserNickName: apiUser.igUserNickName,
           metaAccessToken: apiUser.metaAccessToken,
         };
         setUser(user);

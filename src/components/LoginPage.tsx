@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { BarChart3, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-export function LoginPage() {
+interface LoginPageProps {
+  onRegister?: () => void;
+}
+
+export function LoginPage({ onRegister }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -96,6 +100,16 @@ export function LoginPage() {
                 '로그인'
               )}
             </button>
+
+            {onRegister && (
+              <button
+                type="button"
+                onClick={onRegister}
+                className="w-full py-3 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-all"
+              >
+                회원가입
+              </button>
+            )}
           </form>
 
         </div>

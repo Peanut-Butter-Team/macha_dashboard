@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -1453,19 +1454,25 @@ export function CampaignTab({
   aiAnalysis: _aiAnalysis,
   loading: _loading,
 }: CampaignTabProps) {
+  const { user } = useAuth();
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignListItem | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
   const [notionLoading, setNotionLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Notion에서 캠페인 데이터 로드
+  // 캠페인 데이터 로드
   useEffect(() => {
     const loadCampaigns = async () => {
+      if (!user?.igUserNickName) {
+        setNotionLoading(false);
+        return;
+      }
+
       try {
         setNotionLoading(true);
         setError(null);
-        console.log('[CampaignTab] Starting to load campaigns...');
-        const notionCampaigns = await fetchCampaigns();
+        console.log('[CampaignTab] Starting to load campaigns for:', user.igUserNickName);
+        const notionCampaigns = await fetchCampaigns(user.igUserNickName);
         console.log('[CampaignTab] Loaded campaigns:', notionCampaigns);
         const convertedCampaigns = notionCampaigns.map(convertNotionCampaign);
         setCampaigns(convertedCampaigns);
@@ -1480,7 +1487,7 @@ export function CampaignTab({
     };
 
     loadCampaigns();
-  }, []);
+  }, [user?.igUserNickName]);
 
   // 에러 표시
   if (error) {

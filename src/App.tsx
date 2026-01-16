@@ -16,6 +16,7 @@ import { AdsTab } from './components/tabs/AdsTab';
 import { CampaignTab } from './components/tabs/CampaignTab';
 import { InfluencersTab } from './components/tabs/InfluencersTab';
 import { LoginPage } from './components/LoginPage';
+import { RegisterPage } from './components/RegisterPage';
 import { useAuth } from './contexts/AuthContext';
 import {
   useProfileInsight,
@@ -40,6 +41,7 @@ type TabType = 'profile' | 'ads' | 'campaign' | 'influencers';
 // ============================================
 function App() {
   const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
+  const [showRegister, setShowRegister] = useState(false);
 
   // 로딩 중이면 로딩 표시
   if (authLoading) {
@@ -50,9 +52,12 @@ function App() {
     );
   }
 
-  // 로그인 안되어 있으면 로그인 페이지 표시
+  // 로그인 안되어 있으면 로그인/회원가입 페이지 표시
   if (!isAuthenticated) {
-    return <LoginPage />;
+    if (showRegister) {
+      return <RegisterPage onBackToLogin={() => setShowRegister(false)} />;
+    }
+    return <LoginPage onRegister={() => setShowRegister(true)} />;
   }
 
   return <Dashboard user={user!} logout={logout} />;
