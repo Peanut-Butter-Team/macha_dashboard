@@ -32,7 +32,6 @@ import {
   useProfileContent,
 } from './hooks/useApi';
 import { syncDashMember } from './services/metaDashApi';
-import { fetchCampaigns, syncCampaignData } from './services/notionApi';
 
 // 탭 타입
 type TabType = 'profile' | 'ads' | 'campaign' | 'influencers';
@@ -82,8 +81,8 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
   const { data: dailyProfileData, loading: dailyProfileLoading, refetch: refetchDailyProfile } = useDailyProfileData(period);
   const { data: adData, loading: adLoading, refetch: refetchAd } = useAdPerformance(user.id);
   const { data: dailyAdData, loading: dailyAdLoading, refetch: refetchDailyAd } = useDailyAdData(period, user.id);
-  const { data: influencers, loading: influencersLoading, refetch: refetchInfluencers } = useInfluencers();
-  const { data: seedingList, loading: seedingLoading, refetch: refetchSeeding } = useSeedingList();
+  const { data: influencers, loading: influencersLoading } = useInfluencers();
+  const { data: seedingList, loading: seedingLoading } = useSeedingList();
 
   // seedingList가 로드되면 localSeedingList 초기화
   useEffect(() => {
@@ -92,9 +91,9 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
     }
   }, [seedingList]);
 
-  const { data: affiliateLinks, loading: affiliateLoading, refetch: refetchAffiliate } = useAffiliateLinks();
-  const { data: contentList, loading: contentLoading, refetch: refetchContent } = useContentList();
-  const { data: aiAnalysis, loading: aiLoading, refetch: refetchAI } = useAIAnalysis();
+  const { data: affiliateLinks, loading: affiliateLoading } = useAffiliateLinks();
+  const { data: contentList, loading: contentLoading } = useContentList();
+  const { data: aiAnalysis, loading: aiLoading } = useAIAnalysis();
 
   // 신규 hooks (Meta Dash API)
   const { data: followerDemographic, loading: followerDemographicLoading, refetch: refetchFollowerDemographic } = useFollowerDemographic();
@@ -143,58 +142,6 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
 
     console.log('광고 데이터 새로고침 완료');
   }, [user?.id, refetchAd, refetchDailyAd]);
-
-  // 전체 새로고침 (캠페인 관리 탭용)
-  const handleRefreshAll = useCallback(async () => {
-    console.log('전체 데이터 동기화 시작...');
-
-    // 1. Sync API 호출 (금일 데이터 갱신)
-    if (user?.id) {
-      try {
-        const syncResult = await syncDashMember(user.id);
-        console.log('동기화 결과:', syncResult);
-      } catch (error) {
-        console.error('동기화 실패:', error);
-      }
-    }
-
-    // 2. 캠페인 데이터 동기화 (apify-sync)
-    if (user?.igUserNickName) {
-      try {
-        console.log('캠페인 데이터 동기화 시작...');
-        const campaigns = await fetchCampaigns(user.igUserNickName);
-        // 각 캠페인에 대해 apify-sync 호출
-        await Promise.all(
-          campaigns.map(async (campaign) => {
-            try {
-              await syncCampaignData(campaign.id);
-              console.log(`캠페인 동기화 완료: ${campaign.name}`);
-            } catch (err) {
-              console.error(`캠페인 동기화 실패: ${campaign.name}`, err);
-            }
-          })
-        );
-        console.log('모든 캠페인 동기화 완료');
-      } catch (error) {
-        console.error('캠페인 목록 조회 실패:', error);
-      }
-    }
-
-    // 3. 모든 데이터 새로고침
-    refetchProfile();
-    refetchDailyProfile();
-    refetchFollowerDemographic();
-    refetchProfileContent();
-    refetchAd();
-    refetchDailyAd();
-    refetchInfluencers();
-    refetchSeeding();
-    refetchAffiliate();
-    refetchContent();
-    refetchAI();
-
-    console.log('전체 데이터 새로고침 완료');
-  }, [user?.id, user?.igUserNickName, refetchProfile, refetchDailyProfile, refetchFollowerDemographic, refetchProfileContent, refetchAd, refetchDailyAd, refetchInfluencers, refetchSeeding, refetchAffiliate, refetchContent, refetchAI]);
 
   // 탭 설정 (인플루언서 리스트 탭은 일시 숨김)
   const tabs: { key: TabType; label: string; icon: typeof User }[] = [
