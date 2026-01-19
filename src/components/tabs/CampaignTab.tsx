@@ -12,10 +12,6 @@ import {
 import {
   MessageCircle,
   ExternalLink,
-  Plus,
-  Copy,
-  Check,
-  Link2,
   Package,
   Clock,
   CheckCircle2,
@@ -24,7 +20,6 @@ import {
   Sparkles,
   Image,
   Video,
-  X,
   Eye,
   Heart,
   TrendingUp,
@@ -33,20 +28,19 @@ import {
   Loader2,
 } from 'lucide-react';
 import { InfoTooltip } from '../common/InfoTooltip';
-import { fetchCampaigns, fetchMentions, fetchSeeding, fetchCampaignResults, type NotionCampaign, type NotionMention, type NotionSeeding, type CampaignResultDto } from '../../services/notionApi';
+import { fetchCampaigns, fetchCampaignResults, type NotionCampaign, type CampaignResultDto } from '../../services/notionApi';
 import type {
   Influencer,
   SeedingItem,
-  AffiliateLink,
   ContentItem,
   AIAnalysis,
   SeedingStatus,
+  SeedingType,
 } from '../../types';
 
 interface CampaignTabProps {
   influencers: Influencer[] | null;
   seedingList: SeedingItem[] | null;
-  affiliateLinks: AffiliateLink[] | null;
   contentList: ContentItem[] | null;
   aiAnalysis: AIAnalysis | null;
   loading: boolean;
@@ -62,6 +56,13 @@ const formatCurrency = (num: number): string => {
   if (num >= 100000000) return (num / 100000000).toFixed(1) + '억';
   if (num >= 10000) return (num / 10000).toFixed(0) + '만';
   return num.toLocaleString() + '원';
+};
+
+// 날짜 포맷팅 (2026-01-31T15:00:00 -> 2026-01-31 15:00)
+const formatDateTime = (dateStr: string): string => {
+  if (!dateStr) return '-';
+  // T를 공백으로 바꾸고 초 부분 제거
+  return dateStr.replace('T', ' ').slice(0, 16);
 };
 
 // 캠페인 목록 타입 (Notion 데이터와 호환)
@@ -212,117 +213,6 @@ function SeedingManagement({ seedingList }: { seedingList: SeedingItem[] }) {
           </tbody>
         </table>
       </div>
-    </div>
-  );
-}
-
-function AffiliateLinkManager({ links }: { links: AffiliateLink[] }) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const handleCopy = (link: AffiliateLink) => {
-    navigator.clipboard.writeText(link.url);
-    setCopiedId(link.id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-primary-950">제휴 링크 관리</h3>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <Plus size={16} />
-          새 링크 생성
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {links.map((link) => (
-          <div key={link.id} className="p-4 bg-slate-50 rounded-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary-100 rounded-lg">
-                  <Link2 size={18} className="text-primary-600" />
-                </div>
-                <div>
-                  <div className="font-semibold text-primary-950">{link.influencerName}</div>
-                  <div className="text-sm text-slate-500 font-mono">{link.code}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleCopy(link)}
-                  className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    copiedId === link.id
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {copiedId === link.id ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedId === link.id ? '복사됨' : '복사'}
-                </button>
-                <span
-                  className={`px-2 py-1 rounded text-xs ${
-                    link.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
-                  }`}
-                >
-                  {link.isActive ? '활성' : '비활성'}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <div className="text-slate-500">클릭</div>
-                <div className="font-semibold text-primary-950">{formatNumber(link.clicks)}</div>
-              </div>
-              <div>
-                <div className="text-slate-500">전환</div>
-                <div className="font-semibold text-primary-950">{formatNumber(link.conversions)}</div>
-              </div>
-              <div>
-                <div className="text-slate-500">매출</div>
-                <div className="font-semibold text-emerald-600">{formatCurrency(link.revenue)}</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Create Modal - 간단한 예시 */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-lg font-semibold">새 제휴 링크 생성</h4>
-              <button onClick={() => setShowCreateModal(false)}>
-                <X size={20} className="text-slate-400" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">인플루언서</label>
-                <select className="w-full px-4 py-2 border border-slate-200 rounded-lg">
-                  <option>인플루언서 선택...</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">링크 코드</label>
-                <input
-                  type="text"
-                  placeholder="예: INFLUENCER_2024"
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg"
-                />
-              </div>
-              <button className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-                생성하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1028,9 +918,9 @@ function CampaignListTable({
 }) {
   const [statusFilter, setStatusFilter] = useState<'active' | 'completed'>('active');
 
-  // 상태 매핑 (Notion 한국어 상태값 처리)
+  // 상태 매핑 (서버 상태값 처리)
   const isActive = (status: string) =>
-    status === 'active' || status === 'paused' || status === '진행중' || status === '일시정지' || status === '진행';
+    status === 'active' || status === 'paused' || status === '진행중' || status === '일시정지' || status === '진행' || status === '준비중';
   const isCompleted = (status: string) =>
     status === 'completed' || status === '완료' || status === '종료';
 
@@ -1142,8 +1032,8 @@ function CampaignListTable({
                   )}
                 </td>
                 <td className="py-4 px-4 text-sm text-slate-600 text-center">{campaign.participants}명</td>
-                <td className="py-4 px-4 text-sm text-slate-600">{campaign.startDate}</td>
-                <td className="py-4 px-4 text-sm text-slate-600">{campaign.endDate}</td>
+                <td className="py-4 px-4 text-sm text-slate-600">{formatDateTime(campaign.startDate)}</td>
+                <td className="py-4 px-4 text-sm text-slate-600">{formatDateTime(campaign.endDate)}</td>
                 <td className="py-4 px-4 text-sm text-slate-400">{campaign.manager || '-'}</td>
                 <td className="py-4 px-4 text-center">
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -1163,54 +1053,40 @@ function CampaignListTable({
   );
 }
 
-// Notion 시딩 데이터를 SeedingItem으로 변환
-function convertNotionSeeding(seeding: NotionSeeding): SeedingItem {
-  return {
-    id: seeding.id,
-    campaignId: '',
+// 캠페인 결과 데이터에서 인플루언서 정보를 추출하여 SeedingItem으로 변환
+function extractSeedingFromResults(results: CampaignResultDto[]): SeedingItem[] {
+  const influencerMap = new Map<string, CampaignResultDto>();
+
+  // 인플루언서별로 첫 번째 포스트만 유지 (중복 제거)
+  results.forEach(result => {
+    const key = result.ownerId || result.ownerUsername;
+    if (key && !influencerMap.has(key)) {
+      influencerMap.set(key, result);
+    }
+  });
+
+  return Array.from(influencerMap.values()).map(result => ({
+    id: result.ownerId || result.ownerUsername,
+    campaignId: result.campaignId,
     influencer: {
-      id: seeding.influencer.id,
-      name: seeding.influencer.name,
-      handle: seeding.influencer.handle,
-      platform: 'instagram',
-      thumbnail: seeding.influencer.thumbnail,
-      followers: seeding.influencer.followers,
-      engagementRate: seeding.influencer.engagementRate,
+      id: result.ownerId || result.ownerUsername,
+      name: result.ownerFullName || result.ownerUsername,
+      handle: result.ownerUsername,
+      platform: 'instagram' as const,
+      thumbnail: result.ownerProfilePicUrl || '',
+      followers: 0,
+      engagementRate: 0,
       avgLikes: 0,
       avgComments: 0,
       category: [],
       priceRange: '',
       verified: false,
     },
-    type: seeding.type,
-    status: seeding.status as SeedingStatus,
-    requestDate: seeding.requestDate || '',
-    postDate: seeding.postDate,
-    paymentAmount: seeding.paymentAmount,
-    productValue: seeding.productValue,
-    notes: seeding.notes,
-  };
-}
-
-// Notion 멘션 데이터를 ContentItem으로 변환
-function convertNotionMention(mention: NotionMention): ContentItem {
-  return {
-    id: mention.id,
-    influencerId: '',
-    influencerName: mention.influencerName || mention.handle,
-    platform: 'instagram',
-    type: (mention.type as 'image' | 'video' | 'reel' | 'story') || 'image',
-    thumbnail: mention.thumbnail || 'https://via.placeholder.com/300x400',
-    originalUrl: mention.postUrl,
-    downloadUrl: mention.postUrl,
-    likes: mention.likes,
-    comments: mention.comments,
-    shares: mention.shares,
-    views: mention.views,
-    engagementRate: mention.engagementRate,
-    postedAt: mention.postedAt,
-    caption: mention.caption,
-  };
+    type: 'free' as SeedingType,
+    status: 'completed' as SeedingStatus,
+    requestDate: result.postedAt || '',
+    postDate: result.postedAt,
+  }));
 }
 
 // 캠페인 결과 데이터를 ContentItem으로 변환
@@ -1295,13 +1171,11 @@ async function fetchAIAnalysis(
 function CampaignDetailView({
   campaign,
   onBack: _onBack,
-  affiliateLinks,
 }: {
   campaign: CampaignListItem;
   onBack: () => void;
-  affiliateLinks: AffiliateLink[] | null;
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'performance' | 'seeding' | 'affiliate' | 'content'>('performance');
+  const [activeSubTab, setActiveSubTab] = useState<'performance' | 'seeding' | 'content'>('performance');
   const [notionSeeding, setNotionSeeding] = useState<SeedingItem[]>([]);
   const [notionContent, setNotionContent] = useState<ContentItem[]>([]);
   const [_campaignResults, setCampaignResults] = useState<CampaignResultDto[]>([]);
@@ -1379,26 +1253,18 @@ function CampaignDetailView({
         setDetailLoading(true);
         console.log('[CampaignDetail] Loading detail data for campaign:', campaign.id);
 
-        // 시딩, 멘션, 캠페인 결과 데이터 병렬 로드
-        const [seedingData, mentionsData, resultsData] = await Promise.all([
-          fetchSeeding(campaign.id).catch(() => []),
-          fetchMentions(campaign.id).catch(() => []),
-          fetchCampaignResults(campaign.id).catch(() => []),
-        ]);
+        // 캠페인 결과 데이터 로드 (서버 API)
+        const resultsData = await fetchCampaignResults(campaign.id).catch(() => []);
 
-        console.log('[CampaignDetail] Seeding data:', seedingData);
-        console.log('[CampaignDetail] Mentions data:', mentionsData);
         console.log('[CampaignDetail] Campaign results:', resultsData);
 
-        setNotionSeeding(seedingData.map(convertNotionSeeding));
-        setCampaignResults(resultsData);
+        // 캠페인 결과에서 인플루언서 정보 추출하여 시딩 리스트 생성
+        const seedingData = extractSeedingFromResults(resultsData);
+        console.log('[CampaignDetail] Extracted seeding data:', seedingData);
 
-        // 캠페인 결과가 있으면 우선 사용, 없으면 멘션 데이터 사용
-        if (resultsData.length > 0) {
-          setNotionContent(resultsData.map(convertCampaignResultToContent));
-        } else {
-          setNotionContent(mentionsData.map(convertNotionMention));
-        }
+        setNotionSeeding(seedingData);
+        setCampaignResults(resultsData);
+        setNotionContent(resultsData.map(convertCampaignResultToContent));
       } catch (err) {
         console.error('[CampaignDetail] 상세 데이터 로드 실패:', err);
       } finally {
@@ -1417,7 +1283,6 @@ function CampaignDetailView({
           { key: 'performance', label: '캠페인 성과', icon: BarChart3 },
           { key: 'seeding', label: '참여 인플루언서', icon: Package },
           { key: 'content', label: '콘텐츠 갤러리', icon: Image },
-          { key: 'affiliate', label: '제휴 링크', icon: Link2 },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -1450,7 +1315,6 @@ function CampaignDetailView({
               <SeedingManagement seedingList={notionSeeding} />
             )
           )}
-          {activeSubTab === 'affiliate' && affiliateLinks && <AffiliateLinkManager links={affiliateLinks} />}
           {activeSubTab === 'content' && (
             detailLoading ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center h-32">
@@ -1496,7 +1360,6 @@ function convertNotionCampaign(campaign: NotionCampaign): CampaignListItem {
 export function CampaignTab({
   influencers: _influencers,
   seedingList: _seedingList,
-  affiliateLinks,
   contentList: _contentList,
   aiAnalysis: _aiAnalysis,
   loading: _loading,
@@ -1510,7 +1373,7 @@ export function CampaignTab({
   // 캠페인 데이터 로드
   useEffect(() => {
     const loadCampaigns = async () => {
-      if (!user?.igUserNickName) {
+      if (!user?.id) {
         setNotionLoading(false);
         return;
       }
@@ -1518,8 +1381,8 @@ export function CampaignTab({
       try {
         setNotionLoading(true);
         setError(null);
-        console.log('[CampaignTab] Starting to load campaigns for:', user.igUserNickName);
-        const notionCampaigns = await fetchCampaigns(user.igUserNickName);
+        console.log('[CampaignTab] Starting to load campaigns for dashMemberId:', user.id);
+        const notionCampaigns = await fetchCampaigns(user.id);
         console.log('[CampaignTab] Loaded campaigns:', notionCampaigns);
         const convertedCampaigns = notionCampaigns.map(convertNotionCampaign);
         setCampaigns(convertedCampaigns);
@@ -1534,7 +1397,7 @@ export function CampaignTab({
     };
 
     loadCampaigns();
-  }, [user?.igUserNickName]);
+  }, [user?.id]);
 
   // 에러 표시
   if (error) {
@@ -1557,7 +1420,6 @@ export function CampaignTab({
       <CampaignDetailView
         campaign={selectedCampaign}
         onBack={() => setSelectedCampaign(null)}
-        affiliateLinks={affiliateLinks}
       />
     );
   }

@@ -91,7 +91,7 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
     }
   }, [seedingList]);
 
-  const { data: affiliateLinks, loading: affiliateLoading } = useAffiliateLinks();
+  const { loading: affiliateLoading } = useAffiliateLinks();
   const { data: contentList, loading: contentLoading } = useContentList();
   const { data: aiAnalysis, loading: aiLoading } = useAIAnalysis();
 
@@ -311,7 +311,6 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
           <CampaignTab
             influencers={influencers}
             seedingList={localSeedingList}
-            affiliateLinks={affiliateLinks}
             contentList={contentList}
             aiAnalysis={aiAnalysis}
             loading={isLoading.campaign}
