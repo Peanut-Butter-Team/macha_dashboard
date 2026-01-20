@@ -53,8 +53,13 @@ async function fetchMetaDash<T>(
 export async function syncDashMember(dashMemberId: string): Promise<boolean> {
   try {
     const response = await fetchMetaDash<SyncResponse>(
-      `/api/v1/sync-profile/${dashMemberId}`,
-      { method: 'POST' }
+      `/api/v1/dash-members/sync-profile/${dashMemberId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          time: new Date().toISOString().split('T')[0],
+        }),
+      }
     );
     return response.result?.[0] ?? false;
   } catch (error) {
@@ -67,8 +72,13 @@ export async function syncDashMember(dashMemberId: string): Promise<boolean> {
 export async function syncDashAd(dashMemberId: string): Promise<boolean> {
   try {
     const response = await fetchMetaDash<SyncResponse>(
-      `/api/v1/sync-ad/${dashMemberId}`,
-      { method: 'POST' }
+      `/api/v1/dash-members/sync-ad/${dashMemberId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          time: new Date().toISOString().split('T')[0],
+        }),
+      }
     );
     return response.result?.[0] ?? false;
   } catch (error) {
