@@ -194,6 +194,7 @@ export interface ProfileContentItem {
   type: 'reels' | 'feed' | 'story' | 'carousel';
   uploadDate: string;
   thumbnailUrl?: string;
+  permalink?: string;  // 인스타그램 피드 바로가기 URL
   views?: number;
   reach: number;
   impressions: number;
@@ -225,6 +226,7 @@ export interface AdWithPerformance {
   impressions: number;
   ctr: number;
   cpc: number;
+  roas: number;
 }
 
 // 광고세트 + 성과 (UI용)
@@ -245,6 +247,7 @@ export interface AdSetWithPerformance {
   impressions: number;
   ctr: number;
   cpc: number;
+  roas: number;
   // 소재 목록
   ads: AdWithPerformance[];
 }
@@ -262,6 +265,7 @@ export interface CampaignHierarchy {
   totalImpressions: number;
   ctr: number;
   cpc: number;
+  roas: number;
   // 광고세트 목록
   adSets: AdSetWithPerformance[];
 }

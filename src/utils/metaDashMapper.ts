@@ -191,6 +191,7 @@ export function mapToContentItems(
       type: mapMediaType(dashMedia.mediaType),
       uploadDate: dashMedia.postedAt.split('T')[0],
       thumbnailUrl: dashMedia.thumbnailUrl || dashMedia.mediaUrl,
+      permalink: dashMedia.permalink,  // 인스타그램 피드 바로가기 URL
       views,
       reach,
       impressions,
@@ -619,6 +620,7 @@ export function mapToCampaignHierarchy(
         impressions: perf.impressions,
         ctr: perf.impressions > 0 ? (perf.clicks / perf.impressions) * 100 : 0,
         cpc: perf.clicks > 0 ? perf.spend / perf.clicks : 0,
+        roas: 0, // API에서 전환 가치 미제공
         ads: [],  // 기존 API에서는 소재 데이터 없음
       };
     });
@@ -640,6 +642,7 @@ export function mapToCampaignHierarchy(
       totalImpressions,
       ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
       cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+      roas: 0, // API에서 전환 가치 미제공
       adSets: adSetsWithPerformance,
     };
   });
@@ -823,6 +826,7 @@ export function mapToCampaignHierarchyFromCampaignDetail(
           impressions: adImpressions,
           ctr: adImpressions > 0 ? (adClicks / adImpressions) * 100 : 0,
           cpc: adClicks > 0 ? adSpend / adClicks : 0,
+          roas: 0, // API에서 전환 가치 미제공
         };
       });
 
@@ -848,6 +852,7 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         impressions: totalImpressions,
         ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
         cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+        roas: 0, // API에서 전환 가치 미제공
         ads,
       };
     });
@@ -869,6 +874,7 @@ export function mapToCampaignHierarchyFromCampaignDetail(
       totalImpressions,
       ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
       cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+      roas: 0, // API에서 전환 가치 미제공
       adSets: adSetsWithPerformance,
     };
   });

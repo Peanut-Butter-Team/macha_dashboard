@@ -23,6 +23,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { InfoTooltip } from '../common/InfoTooltip';
+import { getProxiedImageUrl } from '../../utils/imageProxy';
 import type { AdPerformance, DailyAdData, CampaignPerformance, ProfileInsight, CampaignHierarchy } from '../../types';
 
 interface AdsTabProps {
@@ -436,10 +437,14 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
                         </div>
                       </div>
                       {/* 성과 지표 그리드 */}
-                      <div className="grid grid-cols-5 gap-3 ml-7">
+                      <div className="grid grid-cols-6 gap-3 ml-7">
                         <div className="bg-white rounded-lg px-3 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">지출</div>
                           <div className="font-semibold text-slate-800 text-sm">₩{campaign.totalSpend.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                          <div className="text-xs text-slate-500 mb-0.5">ROAS</div>
+                          <div className="font-semibold text-emerald-600 text-sm">{campaign.roas.toFixed(1)}x</div>
                         </div>
                         <div className="bg-white rounded-lg px-3 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">도달</div>
@@ -511,10 +516,14 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
                                 </div>
                               </div>
                               {/* 광고세트 성과 지표 */}
-                              <div className="grid grid-cols-5 gap-2 mt-3 ml-5">
+                              <div className="grid grid-cols-6 gap-2 mt-3 ml-5">
                                 <div className="text-center">
                                   <div className="text-xs text-slate-400">지출</div>
                                   <div className="text-sm text-slate-600">₩{adSet.spend.toLocaleString()}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">ROAS</div>
+                                  <div className="text-sm text-emerald-600 font-medium">{adSet.roas.toFixed(1)}x</div>
                                 </div>
                                 <div className="text-center">
                                   <div className="text-xs text-slate-400">도달</div>
@@ -551,8 +560,9 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
                                       <div className="flex-shrink-0">
                                         {ad.thumbnailUrl || ad.imageUrl ? (
                                           <img
-                                            src={ad.thumbnailUrl || ad.imageUrl || ''}
+                                            src={getProxiedImageUrl(ad.thumbnailUrl || ad.imageUrl)}
                                             alt={ad.adName}
+                                            referrerPolicy="no-referrer"
                                             className="w-12 h-12 object-cover rounded-lg bg-slate-200"
                                             onError={(e) => {
                                               const target = e.target as HTMLImageElement;
@@ -586,11 +596,13 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
                                           <p className="text-xs text-slate-500 line-clamp-1 mb-2">{ad.message}</p>
                                         )}
                                         {/* 소재 성과 지표 */}
-                                        <div className="flex gap-4 text-xs">
+                                        <div className="flex flex-wrap gap-4 text-xs">
                                           <span className="text-slate-500">지출 <span className="text-slate-700 font-medium">₩{ad.spend.toLocaleString()}</span></span>
+                                          <span className="text-slate-500">ROAS <span className="text-emerald-600 font-medium">{ad.roas.toFixed(1)}x</span></span>
                                           <span className="text-slate-500">도달 <span className="text-slate-700 font-medium">{formatNumber(ad.reach)}</span></span>
                                           <span className="text-slate-500">클릭 <span className="text-slate-700 font-medium">{formatNumber(ad.clicks)}</span></span>
                                           <span className="text-slate-500">CTR <span className="text-slate-700 font-medium">{ad.ctr.toFixed(2)}%</span></span>
+                                          <span className="text-slate-500">CPC <span className="text-slate-700 font-medium">₩{Math.round(ad.cpc).toLocaleString()}</span></span>
                                         </div>
                                       </div>
                                     </div>
