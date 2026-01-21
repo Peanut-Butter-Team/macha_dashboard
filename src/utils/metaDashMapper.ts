@@ -20,6 +20,7 @@ import type {
   CampaignPerformance,
   CampaignHierarchy,
   AdSetWithPerformance,
+  AdWithPerformance,
 } from '../types';
 
 // 성장률 계산 헬퍼 함수
@@ -618,6 +619,7 @@ export function mapToCampaignHierarchy(
         impressions: perf.impressions,
         ctr: perf.impressions > 0 ? (perf.clicks / perf.impressions) * 100 : 0,
         cpc: perf.clicks > 0 ? perf.spend / perf.clicks : 0,
+        ads: [],  // 기존 API에서는 소재 데이터 없음
       };
     });
 
@@ -794,6 +796,36 @@ export function mapToCampaignHierarchyFromCampaignDetail(
       const adSet = adDetailObj.dashAdSet;
       const childObjs = adDetailObj.adSetChildObjs || [];
 
+      // 소재(Ad) 목록 매핑
+      const ads: AdWithPerformance[] = childObjs.map(child => {
+        const adDetail = child.dashAdDetailEntity;
+        const insight = child.dashAdAccountInsight;
+        const adSpend = insight?.spend || 0;
+        const adReach = insight?.reach || 0;
+        const adClicks = insight?.clicks || 0;
+        const adImpressions = insight?.impressions || 0;
+
+        return {
+          id: adDetail?.id || '',
+          adId: adDetail?.adId || '',
+          adName: adDetail?.adName || '',
+          status: adDetail?.status || '',
+          effectiveStatus: adDetail?.effectiveStatus || '',
+          creativeId: adDetail?.creativeId || '',
+          creativeName: adDetail?.creativeName || '',
+          thumbnailUrl: adDetail?.thumbnailUrl || '',
+          imageUrl: adDetail?.imageUrl || null,
+          title: adDetail?.title || null,
+          message: adDetail?.message || null,
+          spend: adSpend,
+          reach: adReach,
+          clicks: adClicks,
+          impressions: adImpressions,
+          ctr: adImpressions > 0 ? (adClicks / adImpressions) * 100 : 0,
+          cpc: adClicks > 0 ? adSpend / adClicks : 0,
+        };
+      });
+
       // 해당 광고세트의 모든 광고 성과 합산
       const totalSpend = childObjs.reduce((sum, c) => sum + (c.dashAdAccountInsight?.spend || 0), 0);
       const totalReach = childObjs.reduce((sum, c) => sum + (c.dashAdAccountInsight?.reach || 0), 0);
@@ -816,6 +848,7 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         impressions: totalImpressions,
         ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
         cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+        ads,
       };
     });
 

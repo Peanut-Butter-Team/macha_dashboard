@@ -204,6 +204,29 @@ export interface ProfileContentItem {
   engagementRate: number;
 }
 
+// 소재(Ad) + 성과 (UI용)
+export interface AdWithPerformance {
+  id: string;
+  adId: string;
+  adName: string;
+  status: string;
+  effectiveStatus: string;
+  // 크리에이티브 정보
+  creativeId: string;
+  creativeName: string;
+  thumbnailUrl: string;
+  imageUrl: string | null;
+  title: string | null;
+  message: string | null;
+  // 성과 지표
+  spend: number;
+  reach: number;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  cpc: number;
+}
+
 // 광고세트 + 성과 (UI용)
 export interface AdSetWithPerformance {
   id: string;
@@ -222,6 +245,8 @@ export interface AdSetWithPerformance {
   impressions: number;
   ctr: number;
   cpc: number;
+  // 소재 목록
+  ads: AdWithPerformance[];
 }
 
 // 캠페인 계층 구조 (UI용)

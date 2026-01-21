@@ -196,6 +196,7 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
   const [campaignStatusFilter, setCampaignStatusFilter] = useState<'active' | 'ended'>('active');  // 캠페인 상태 필터
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());  // 확장된 캠페인 ID
+  const [expandedAdSets, setExpandedAdSets] = useState<Set<string>>(new Set());  // 확장된 광고세트 ID
   const ITEMS_PER_PAGE = 5;
 
   // 캠페인 상태별 필터링 (실제 데이터 발생 여부 기준) + 생성일 기준 오름차순 정렬
@@ -227,6 +228,19 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
         next.delete(campaignId);
       } else {
         next.add(campaignId);
+      }
+      return next;
+    });
+  };
+
+  // 광고세트 확장/축소 토글
+  const toggleAdSet = (adSetId: string) => {
+    setExpandedAdSets(prev => {
+      const next = new Set(prev);
+      if (next.has(adSetId)) {
+        next.delete(adSetId);
+      } else {
+        next.add(adSetId);
       }
       return next;
     });
@@ -408,8 +422,13 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
                           className={`text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-slate-900 truncate">{campaign.campaignName}</div>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-600 text-white">
+                              캠페인
+                            </span>
+                            <span className="font-medium text-slate-900 truncate">{campaign.campaignName}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 ml-14">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                               {formatObjective(campaign.objective)}
                             </span>
@@ -447,59 +466,148 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
                         <div className="px-4 py-2 bg-slate-100/50 border-b border-slate-100">
                           <span className="text-xs font-medium text-slate-500">광고세트 ({campaign.adSets.length}개)</span>
                         </div>
-                        {campaign.adSets.map((adSet, idx) => (
+                        {campaign.adSets.map((adSet, idx) => {
+                          const isAdSetExpanded = expandedAdSets.has(adSet.id);
+                          return (
                           <div
                             key={adSet.id}
-                            className={`p-4 hover:bg-slate-50 ${
-                              idx < campaign.adSets.length - 1 ? 'border-b border-slate-100' : ''
-                            }`}
+                            className={idx < campaign.adSets.length - 1 ? 'border-b border-slate-100' : ''}
                           >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />
-                                  <span className="text-sm font-medium text-slate-700 truncate">{adSet.name}</span>
-                                  <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
-                                    adSet.status.toUpperCase() === 'ACTIVE'
-                                      ? 'bg-emerald-100 text-emerald-700'
-                                      : adSet.status.toUpperCase() === 'PAUSED'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-slate-100 text-slate-600'
-                                  }`}>
-                                    {adSet.status.toUpperCase() === 'ACTIVE' ? '진행중' : adSet.status.toUpperCase() === 'PAUSED' ? '일시정지' : adSet.status}
-                                  </span>
+                            {/* 광고세트 헤더 (클릭 가능) */}
+                            <div
+                              onClick={() => toggleAdSet(adSet.id)}
+                              className="p-4 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <ChevronDown
+                                      size={14}
+                                      className={`text-slate-400 transition-transform flex-shrink-0 ${isAdSetExpanded ? '' : '-rotate-90'}`}
+                                    />
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-cyan-600 text-white flex-shrink-0">
+                                      광고세트
+                                    </span>
+                                    <span className="text-sm font-medium text-slate-700 truncate">{adSet.name}</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
+                                      adSet.status.toUpperCase() === 'ACTIVE'
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : adSet.status.toUpperCase() === 'PAUSED'
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {adSet.status.toUpperCase() === 'ACTIVE' ? '진행중' : adSet.status.toUpperCase() === 'PAUSED' ? '일시정지' : adSet.status}
+                                    </span>
+                                    {adSet.ads && adSet.ads.length > 0 && (
+                                      <span className="text-xs text-slate-400">
+                                        (소재 {adSet.ads.length}개)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-slate-500 ml-5">
+                                    예산: {adSet.dailyBudget ? `₩${parseInt(adSet.dailyBudget).toLocaleString()}/일` : adSet.lifetimeBudget ? `₩${parseInt(adSet.lifetimeBudget).toLocaleString()} (전체)` : '-'}
+                                    {adSet.optimizationGoal && ` • ${formatObjective(adSet.optimizationGoal)}`}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-slate-500 ml-3.5">
-                                  예산: {adSet.dailyBudget ? `₩${parseInt(adSet.dailyBudget).toLocaleString()}/일` : adSet.lifetimeBudget ? `₩${parseInt(adSet.lifetimeBudget).toLocaleString()} (전체)` : '-'}
-                                  {adSet.optimizationGoal && ` • ${formatObjective(adSet.optimizationGoal)}`}
+                              </div>
+                              {/* 광고세트 성과 지표 */}
+                              <div className="grid grid-cols-5 gap-2 mt-3 ml-5">
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">지출</div>
+                                  <div className="text-sm text-slate-600">₩{adSet.spend.toLocaleString()}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">도달</div>
+                                  <div className="text-sm text-slate-600">{formatNumber(adSet.reach)}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">클릭</div>
+                                  <div className="text-sm text-slate-600">{formatNumber(adSet.clicks)}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">CTR</div>
+                                  <div className="text-sm text-slate-600">{adSet.ctr.toFixed(2)}%</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">CPC</div>
+                                  <div className="text-sm text-slate-600">₩{Math.round(adSet.cpc).toLocaleString()}</div>
                                 </div>
                               </div>
                             </div>
-                            {/* 광고세트 성과 지표 */}
-                            <div className="grid grid-cols-5 gap-2 mt-3 ml-3.5">
-                              <div className="text-center">
-                                <div className="text-xs text-slate-400">지출</div>
-                                <div className="text-sm text-slate-600">₩{adSet.spend.toLocaleString()}</div>
+
+                            {/* 소재 목록 (확장 시) */}
+                            {isAdSetExpanded && adSet.ads && adSet.ads.length > 0 && (
+                              <div className="bg-slate-50/50 border-t border-slate-100">
+                                <div className="px-4 py-2 bg-slate-100/30 border-b border-slate-100 ml-5">
+                                  <span className="text-xs font-medium text-slate-400">소재 ({adSet.ads.length}개)</span>
+                                </div>
+                                {adSet.ads.map((ad, adIdx) => (
+                                  <div
+                                    key={ad.id || adIdx}
+                                    className={`p-3 ml-5 ${adIdx < adSet.ads.length - 1 ? 'border-b border-slate-100' : ''}`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      {/* 썸네일 */}
+                                      <div className="flex-shrink-0">
+                                        {ad.thumbnailUrl || ad.imageUrl ? (
+                                          <img
+                                            src={ad.thumbnailUrl || ad.imageUrl || ''}
+                                            alt={ad.adName}
+                                            className="w-12 h-12 object-cover rounded-lg bg-slate-200"
+                                            onError={(e) => {
+                                              const target = e.target as HTMLImageElement;
+                                              target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="%23e2e8f0"><rect width="48" height="48"/></svg>';
+                                            }}
+                                          />
+                                        ) : (
+                                          <div className="w-12 h-12 rounded-lg bg-slate-200 flex items-center justify-center">
+                                            <span className="text-slate-400 text-xs">No img</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {/* 소재 정보 */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-600 text-white flex-shrink-0">
+                                            소재
+                                          </span>
+                                          <span className="text-sm font-medium text-slate-700 truncate">{ad.adName || '이름 없음'}</span>
+                                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                            ad.status.toUpperCase() === 'ACTIVE'
+                                              ? 'bg-emerald-100 text-emerald-700'
+                                              : ad.status.toUpperCase() === 'PAUSED'
+                                              ? 'bg-amber-100 text-amber-700'
+                                              : 'bg-slate-100 text-slate-600'
+                                          }`}>
+                                            {ad.status.toUpperCase() === 'ACTIVE' ? '진행' : ad.status.toUpperCase() === 'PAUSED' ? '정지' : ad.status}
+                                          </span>
+                                        </div>
+                                        {ad.message && (
+                                          <p className="text-xs text-slate-500 line-clamp-1 mb-2">{ad.message}</p>
+                                        )}
+                                        {/* 소재 성과 지표 */}
+                                        <div className="flex gap-4 text-xs">
+                                          <span className="text-slate-500">지출 <span className="text-slate-700 font-medium">₩{ad.spend.toLocaleString()}</span></span>
+                                          <span className="text-slate-500">도달 <span className="text-slate-700 font-medium">{formatNumber(ad.reach)}</span></span>
+                                          <span className="text-slate-500">클릭 <span className="text-slate-700 font-medium">{formatNumber(ad.clicks)}</span></span>
+                                          <span className="text-slate-500">CTR <span className="text-slate-700 font-medium">{ad.ctr.toFixed(2)}%</span></span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                              <div className="text-center">
-                                <div className="text-xs text-slate-400">도달</div>
-                                <div className="text-sm text-slate-600">{formatNumber(adSet.reach)}</div>
+                            )}
+
+                            {/* 소재 없음 */}
+                            {isAdSetExpanded && (!adSet.ads || adSet.ads.length === 0) && (
+                              <div className="p-3 ml-5 text-xs text-slate-400 bg-slate-50/50 border-t border-slate-100 text-center">
+                                소재가 없습니다.
                               </div>
-                              <div className="text-center">
-                                <div className="text-xs text-slate-400">클릭</div>
-                                <div className="text-sm text-slate-600">{formatNumber(adSet.clicks)}</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-xs text-slate-400">CTR</div>
-                                <div className="text-sm text-slate-600">{adSet.ctr.toFixed(2)}%</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-xs text-slate-400">CPC</div>
-                                <div className="text-sm text-slate-600">₩{Math.round(adSet.cpc).toLocaleString()}</div>
-                              </div>
-                            </div>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
