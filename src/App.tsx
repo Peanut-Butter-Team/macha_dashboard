@@ -143,12 +143,12 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
     console.log('광고 데이터 새로고침 완료');
   }, [user?.id, refetchAd, refetchDailyAd]);
 
-  // 탭 설정 (인플루언서 리스트 탭은 일시 숨김)
+  // 탭 설정
   const tabs: { key: TabType; label: string; icon: typeof User }[] = [
     { key: 'profile', label: '프로필 인사이트', icon: User },
     { key: 'ads', label: '광고 성과', icon: TrendingUp },
     { key: 'campaign', label: '캠페인 관리', icon: Megaphone },
-    // { key: 'influencers', label: '인플루언서 리스트', icon: User },
+    { key: 'influencers', label: '인플루언서 리스트', icon: User },
   ];
 
   // 로딩 상태 계산

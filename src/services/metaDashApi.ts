@@ -8,6 +8,8 @@ import type {
   DashMediaResponse,
   DashAdAccount,
   DashAdAccountWithInsights,
+  DashInfluencer,
+  DashInfluencerDetailResponse,
 } from '../types/metaDash';
 
 const BASE_URL = 'https://matcha.pnutbutter.kr';
@@ -145,4 +147,22 @@ export async function fetchDashAdInsight(
     `/api/v1/dash-ad/my-insight/${dashMemberId}`
   );
   return response.result || [];
+}
+
+// 8. 인플루언서 목록 조회
+export async function fetchDashInfluencers(): Promise<DashInfluencer[]> {
+  const response = await fetchMetaDash<MetaDashResponse<DashInfluencer[]>>(
+    `/api/v1/dash-influencers`
+  );
+  return response.result || [];
+}
+
+// 9. 인플루언서 상세 조회
+export async function fetchDashInfluencerDetail(
+  influencerId: string
+): Promise<DashInfluencerDetailResponse | null> {
+  const response = await fetchMetaDash<MetaDashResponse<DashInfluencerDetailResponse[]>>(
+    `/api/v1/dash-influencers/${influencerId}`
+  );
+  return response.result?.[0] || null;
 }

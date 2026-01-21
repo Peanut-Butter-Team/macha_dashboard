@@ -164,3 +164,76 @@ export interface DashAdAccountWithInsights {
   dashAdAccount: DashAdAccount;
   dashAdDetailWithInsights: DashAdDetailWithInsight[];
 }
+
+// 13. 인플루언서 (목록용)
+export interface DashInfluencer {
+  id: string;
+  name: string;
+  handle: string;
+  platform: string;
+  profileImage: string;
+  followers: number;
+  engagementRate: number;
+  avgLikes: number;
+  avgComments: number;
+  category: string[];
+  email: string;
+  phone: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 14. 인플루언서 포스트 (Apify 수집)
+export interface DashInfluencerPost {
+  id: string;
+  type: string;
+  shortCode: string;
+  caption: string;
+  hashtags: string[];
+  mentions: string[];
+  url: string;
+  commentsCount: number;
+  displayUrl: string;
+  images: string[];
+  likesCount: number;
+  timestamp: string;
+  ownerUsername: string;
+  ownerId: string;
+}
+
+// 15. 인플루언서 상세 - Apify 데이터
+export interface DashInfluencerDetail {
+  id: string;
+  influencerId: string;
+  username: string;
+  url: string;
+  fullName: string;
+  biography: string;
+  followersCount: number;
+  followsCount: number;
+  isBusinessAccount: boolean;
+  businessCategoryName: string;
+  verified: boolean;
+  profilePicUrl: string;
+  profilePicUrlHD: string;
+  postsCount: number;
+  latestPosts: DashInfluencerPost[];
+}
+
+// 16. 인플루언서 상세 조회 응답
+export interface DashInfluencerDetailResponse {
+  dashInfluencer: {
+    id: string;
+    name: string;
+    username: string;
+    email: string;
+    followerCount: number;
+    engagementRate: number;
+    averageLikes: number;
+    averageComments: number;
+    profileImageUrl: string;
+    status: string;
+  };
+  dashInfluencerDetail: DashInfluencerDetail | null;
+}
