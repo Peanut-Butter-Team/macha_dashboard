@@ -8,6 +8,7 @@ import type {
   DashAdAccountWithInsights,
   DashAdAccountInsight,
   DashAdSet,
+  DashAdCampaignDetailItem,
 } from '../types/metaDash';
 import type {
   ProfileInsight,
@@ -630,6 +631,7 @@ export function mapToCampaignHierarchy(
       campaignId: campaign.campaignId,
       campaignName: campaign.campaignName,
       objective: campaign.objective,
+      createdTime: '',  // 기존 API에서는 생성일 정보 없음
       totalSpend,
       totalReach,
       totalClicks,
@@ -637,6 +639,255 @@ export function mapToCampaignHierarchy(
       ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
       cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
       adSets: adSetsWithPerformance,
+    };
+  });
+}
+
+// ============================================
+// 신규 캠페인 상세 API 응답 변환 함수들
+// ============================================
+
+// 9. 캠페인 상세 응답에서 광고 성과 변환
+export function mapToAdPerformanceFromCampaignDetail(
+  campaignDetails: DashAdCampaignDetailItem[]
+): AdPerformance {
+  // 모든 광고 인사이트 추출
+  const allInsights: DashAdAccountInsight[] = campaignDetails
+    .flatMap(detail => detail.adDetailResponseObjs || [])
+    .flatMap(adDetailObj => adDetailObj.adSetChildObjs || [])
+    .map(child => child.dashAdAccountInsight)
+    .filter(Boolean);
+
+  if (allInsights.length === 0) {
+    return {
+      spend: 0,
+      spendGrowth: 0,
+      roas: 0,
+      roasGrowth: 0,
+      cpc: 0,
+      cpcGrowth: 0,
+      ctr: 0,
+      ctrGrowth: 0,
+      impressions: 0,
+      reach: 0,
+      reachGrowth: 0,
+      clicks: 0,
+      clicksGrowth: 0,
+      conversions: 0,
+      frequency: 1,
+    };
+  }
+
+  // 날짜별 그룹핑
+  const dateMap = new Map<string, DashAdAccountInsight[]>();
+  for (const insight of allInsights) {
+    const dateStr = insight.time.split('T')[0];
+    if (!dateMap.has(dateStr)) {
+      dateMap.set(dateStr, []);
+    }
+    dateMap.get(dateStr)!.push(insight);
+  }
+
+  // 날짜 정렬 (최신 순)
+  const sortedDates = Array.from(dateMap.keys()).sort().reverse();
+  const todayDate = sortedDates[0];
+  const yesterdayDate = sortedDates[1];
+
+  // 오늘 합계
+  const todayInsights = dateMap.get(todayDate) || [];
+  const spend = todayInsights.reduce((sum, i) => sum + i.spend, 0);
+  const impressions = todayInsights.reduce((sum, i) => sum + i.impressions, 0);
+  const clicks = todayInsights.reduce((sum, i) => sum + i.clicks, 0);
+  const reach = todayInsights.reduce((sum, i) => sum + i.reach, 0);
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const cpc = clicks > 0 ? spend / clicks : 0;
+  const frequency = reach > 0 ? impressions / reach : 1;
+
+  // 어제 합계
+  const yesterdayInsights = dateMap.get(yesterdayDate) || [];
+  const yesterdaySpend = yesterdayInsights.reduce((sum, i) => sum + i.spend, 0);
+  const yesterdayImpressions = yesterdayInsights.reduce((sum, i) => sum + i.impressions, 0);
+  const yesterdayClicks = yesterdayInsights.reduce((sum, i) => sum + i.clicks, 0);
+  const yesterdayReach = yesterdayInsights.reduce((sum, i) => sum + i.reach, 0);
+  const yesterdayCtr = yesterdayImpressions > 0 ? (yesterdayClicks / yesterdayImpressions) * 100 : 0;
+  const yesterdayCpc = yesterdayClicks > 0 ? yesterdaySpend / yesterdayClicks : 0;
+
+  return {
+    spend,
+    spendGrowth: calculateGrowth(spend, yesterdaySpend),
+    roas: 0,
+    roasGrowth: 0,
+    cpc,
+    cpcGrowth: calculateGrowth(cpc, yesterdayCpc),
+    ctr,
+    ctrGrowth: calculateGrowth(ctr, yesterdayCtr),
+    impressions,
+    reach,
+    reachGrowth: calculateGrowth(reach, yesterdayReach),
+    clicks,
+    clicksGrowth: calculateGrowth(clicks, yesterdayClicks),
+    conversions: 0,
+    frequency,
+  };
+}
+
+// 10. 캠페인 상세 응답에서 일별 광고 데이터 변환
+export function mapToDailyAdDataFromCampaignDetail(
+  campaignDetails: DashAdCampaignDetailItem[]
+): DailyAdData[] {
+  // 모든 광고 인사이트 추출
+  const allInsights: DashAdAccountInsight[] = campaignDetails
+    .flatMap(detail => detail.adDetailResponseObjs || [])
+    .flatMap(adDetailObj => adDetailObj.adSetChildObjs || [])
+    .map(child => child.dashAdAccountInsight)
+    .filter(Boolean);
+
+  if (allInsights.length === 0) {
+    return [];
+  }
+
+  // 날짜별 그룹핑 및 합계
+  const dateMap = new Map<string, {
+    spend: number;
+    impressions: number;
+    clicks: number;
+    reach: number;
+  }>();
+
+  for (const insight of allInsights) {
+    const dateStr = insight.time.split('T')[0];
+    const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0 };
+    dateMap.set(dateStr, {
+      spend: existing.spend + insight.spend,
+      impressions: existing.impressions + insight.impressions,
+      clicks: existing.clicks + insight.clicks,
+      reach: existing.reach + insight.reach,
+    });
+  }
+
+  // 날짜순 정렬 후 변환 (최근 14일)
+  return Array.from(dateMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-14)
+    .map(([dateStr, data]) => ({
+      date: formatDateToMMDD(dateStr + 'T00:00:00'),
+      spend: data.spend,
+      roas: 0,
+      clicks: data.clicks,
+      impressions: data.impressions,
+      conversions: 0,
+      ctr: data.impressions > 0 ? (data.clicks / data.impressions) * 100 : 0,
+      cpc: data.clicks > 0 ? data.spend / data.clicks : 0,
+    }));
+}
+
+// 11. 캠페인 상세 응답에서 캠페인 계층 구조 변환
+export function mapToCampaignHierarchyFromCampaignDetail(
+  campaignDetails: DashAdCampaignDetailItem[]
+): CampaignHierarchy[] {
+  return campaignDetails.map(detail => {
+    const campaign = detail.dashAdCampaign;
+    const adDetailObjs = detail.adDetailResponseObjs || [];
+
+    // 광고세트별 성과 매핑
+    const adSetsWithPerformance: AdSetWithPerformance[] = adDetailObjs.map(adDetailObj => {
+      const adSet = adDetailObj.dashAdSet;
+      const childObjs = adDetailObj.adSetChildObjs || [];
+
+      // 해당 광고세트의 모든 광고 성과 합산
+      const totalSpend = childObjs.reduce((sum, c) => sum + (c.dashAdAccountInsight?.spend || 0), 0);
+      const totalReach = childObjs.reduce((sum, c) => sum + (c.dashAdAccountInsight?.reach || 0), 0);
+      const totalClicks = childObjs.reduce((sum, c) => sum + (c.dashAdAccountInsight?.clicks || 0), 0);
+      const totalImpressions = childObjs.reduce((sum, c) => sum + (c.dashAdAccountInsight?.impressions || 0), 0);
+
+      return {
+        id: adSet.id,
+        metaAdSetId: adSet.metaAdSetId,
+        name: adSet.name,
+        status: adSet.status,
+        effectiveStatus: adSet.effectiveStatus,
+        dailyBudget: adSet.dailyBudget,
+        lifetimeBudget: adSet.lifetimeBudget,
+        optimizationGoal: adSet.optimizationGoal,
+        bidStrategy: adSet.bidStrategy,
+        spend: totalSpend,
+        reach: totalReach,
+        clicks: totalClicks,
+        impressions: totalImpressions,
+        ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+        cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+      };
+    });
+
+    // 캠페인 전체 성과 합산
+    const totalSpend = adSetsWithPerformance.reduce((sum, s) => sum + s.spend, 0);
+    const totalReach = adSetsWithPerformance.reduce((sum, s) => sum + s.reach, 0);
+    const totalClicks = adSetsWithPerformance.reduce((sum, s) => sum + s.clicks, 0);
+    const totalImpressions = adSetsWithPerformance.reduce((sum, s) => sum + s.impressions, 0);
+
+    return {
+      campaignId: campaign.id,
+      campaignName: campaign.name,
+      objective: campaign.objective,
+      createdTime: campaign.createdTime || campaign.startTime || '',
+      totalSpend,
+      totalReach,
+      totalClicks,
+      totalImpressions,
+      ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+      cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+      adSets: adSetsWithPerformance,
+    };
+  });
+}
+
+// 12. 캠페인 상세 응답에서 캠페인별 성과 변환
+export function mapToCampaignPerformanceFromCampaignDetail(
+  campaignDetails: DashAdCampaignDetailItem[]
+): CampaignPerformance[] {
+  // 모든 광고 추출
+  const allAds = campaignDetails
+    .flatMap(detail => detail.adDetailResponseObjs || [])
+    .flatMap(adDetailObj => adDetailObj.adSetChildObjs || [])
+    .filter(child => child.dashAdDetailEntity && child.dashAdAccountInsight);
+
+  if (allAds.length === 0) {
+    return [];
+  }
+
+  // adId로 그룹핑
+  const adMap = new Map<string, typeof allAds>();
+
+  for (const ad of allAds) {
+    const adId = ad.dashAdDetailEntity.adId;
+    if (!adMap.has(adId)) adMap.set(adId, []);
+    adMap.get(adId)!.push(ad);
+  }
+
+  // 광고별 합산
+  return Array.from(adMap.entries()).map(([adId, records]) => {
+    const detail = records[0].dashAdDetailEntity;
+    const totalSpend = records.reduce((sum, r) => sum + r.dashAdAccountInsight.spend, 0);
+    const totalReach = records.reduce((sum, r) => sum + r.dashAdAccountInsight.reach, 0);
+    const totalClicks = records.reduce((sum, r) => sum + r.dashAdAccountInsight.clicks, 0);
+    const totalImpressions = records.reduce((sum, r) => sum + r.dashAdAccountInsight.impressions, 0);
+
+    const earliestTime = records.reduce((min, r) =>
+      r.dashAdAccountInsight.time < min ? r.dashAdAccountInsight.time : min,
+      records[0].dashAdAccountInsight.time
+    );
+
+    return {
+      id: adId,
+      name: detail.adName,
+      spend: totalSpend,
+      roas: 0,
+      reach: totalReach,
+      clicks: totalClicks,
+      ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+      cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+      status: mapAdStatus(detail.status),
+      startDate: earliestTime,
     };
   });
 }

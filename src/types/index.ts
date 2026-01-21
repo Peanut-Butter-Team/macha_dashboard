@@ -229,6 +229,7 @@ export interface CampaignHierarchy {
   campaignId: string;
   campaignName: string;
   objective: string;
+  createdTime: string;  // 캠페인 생성일
   // 캠페인 전체 성과 (합산)
   totalSpend: number;
   totalReach: number;

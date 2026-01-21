@@ -32,17 +32,18 @@ import {
   fetchDashFollowers,
   fetchDashFollowerInsight,
   fetchDashMedias,
-  fetchDashAdInsight,
+  fetchDashAdList,
+  fetchDashAdCampaignDetail,
 } from '../services/metaDashApi';
 import {
   mapToProfileInsight,
   mapToDailyProfileData,
   mapToFollowerDemographic,
   mapToContentItems,
-  mapToAdPerformance,
-  mapToDailyAdData,
-  mapToCampaignPerformance,
-  mapToCampaignHierarchy,
+  mapToAdPerformanceFromCampaignDetail,
+  mapToDailyAdDataFromCampaignDetail,
+  mapToCampaignPerformanceFromCampaignDetail,
+  mapToCampaignHierarchyFromCampaignDetail,
 } from '../utils/metaDashMapper';
 
 // ============================================
@@ -199,7 +200,7 @@ export function useAdPerformance(userId?: string): ApiResponse<AdPerformanceResu
       setData({
         adPerformance: AD_PERFORMANCE,
         campaignData: CAMPAIGN_PERFORMANCE_DATA,
-        campaignHierarchy: [],  // 더미 데이터 시 빈 배열
+        campaignHierarchy: [],
       });
       return;
     }
@@ -208,13 +209,23 @@ export function useAdPerformance(userId?: string): ApiResponse<AdPerformanceResu
     setError(null);
 
     try {
-      // Meta Dash API 호출
-      const adInsights = await fetchDashAdInsight(userId);
+      // 1. 캠페인 목록 조회
+      const campaignList = await fetchDashAdList(userId);
 
-      // 데이터 변환
-      const adPerformance = mapToAdPerformance(adInsights);
-      const campaignData = mapToCampaignPerformance(adInsights);
-      const campaignHierarchy = mapToCampaignHierarchy(adInsights);  // 캠페인 계층 구조
+      // 2. 각 캠페인별 상세 조회 (병렬 처리)
+      const campaignDetailPromises = campaignList.map(item =>
+        fetchDashAdCampaignDetail(userId, item.dashAdCampaign.id)
+      );
+      const campaignDetailsResults = await Promise.all(campaignDetailPromises);
+
+      // 3. 모든 상세 데이터 합치기
+      const allCampaignDetails = campaignDetailsResults.flat();
+
+      // 4. 데이터 변환
+      const adPerformance = mapToAdPerformanceFromCampaignDetail(allCampaignDetails);
+      const campaignData = mapToCampaignPerformanceFromCampaignDetail(allCampaignDetails);
+      const campaignHierarchy = mapToCampaignHierarchyFromCampaignDetail(allCampaignDetails);
+
       setData({ adPerformance, campaignData, campaignHierarchy });
       setError(null);
     } catch (err) {
@@ -259,11 +270,20 @@ export function useDailyAdData(period: string, userId?: string): ApiResponse<Dai
     setError(null);
 
     try {
-      // Meta Dash API 호출
-      const adInsights = await fetchDashAdInsight(userId);
+      // 1. 캠페인 목록 조회
+      const campaignList = await fetchDashAdList(userId);
 
-      // 데이터 변환
-      const dailyData = mapToDailyAdData(adInsights);
+      // 2. 각 캠페인별 상세 조회 (병렬 처리)
+      const campaignDetailPromises = campaignList.map(item =>
+        fetchDashAdCampaignDetail(userId, item.dashAdCampaign.id)
+      );
+      const campaignDetailsResults = await Promise.all(campaignDetailPromises);
+
+      // 3. 모든 상세 데이터 합치기
+      const allCampaignDetails = campaignDetailsResults.flat();
+
+      // 4. 데이터 변환
+      const dailyData = mapToDailyAdDataFromCampaignDetail(allCampaignDetails);
       setData(dailyData);
       setError(null);
     } catch (err) {

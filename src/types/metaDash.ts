@@ -195,19 +195,22 @@ export interface DashAdAccountWithInsights {
 export interface DashInfluencer {
   id: string;
   name: string;
-  handle: string;
-  platform: string;
-  profileImage: string;
-  followers: number;
-  engagementRate: number;
-  avgLikes: number;
-  avgComments: number;
+  username: string;
+  email: string | null;
+  phoneNumber: string | null;
+  followerCount: number | null;
+  engagementRate: number | null;
+  averageLikes: number | null;
+  averageComments: number | null;
+  profileImageUrl: string | null;
   category: string[];
-  email: string;
-  phone: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
+  activityField: string[];
+  availableContentTypes: string[];
+  desiredCompensation: string[];
+  privacyAgree: boolean;
+  status: string | null;
+  createdTime: string;
+  updateTime: string;
 }
 
 // 14. 인플루언서 포스트 (Apify 수집)
@@ -262,4 +265,49 @@ export interface DashInfluencerDetailResponse {
     status: string;
   };
   dashInfluencerDetail: DashInfluencerDetail | null;
+}
+
+// ============================================
+// 광고 캠페인 API 타입 (신규)
+// ============================================
+
+// 17. 광고 캠페인 정보
+export interface DashAdCampaign {
+  id: string;
+  metaId: string;
+  dashMemberId: string;
+  adAccountId: string;
+  time: string;
+  status: string;
+  name: string;
+  effectiveStatus: string;
+  objective: string;
+  startTime: string;
+  createdTime: string;
+  updatedTime: string;
+}
+
+// 18. 캠페인 목록 아이템 (/api/v1/dash-ad/my-list 응답)
+export interface DashAdListItem {
+  dashAdCampaign: DashAdCampaign;
+  dashAdAccount: DashAdAccount;
+}
+
+// 19. 광고 상세 + 인사이트 (광고세트 하위)
+export interface AdSetChildObj {
+  dashAdDetailEntity: DashAdDetailEntity;
+  dashAdAccountInsight: DashAdAccountInsight;
+}
+
+// 20. 광고세트 + 자식 광고들
+export interface AdDetailResponseObj {
+  dashAdSet: DashAdSet;
+  adSetChildObjs: AdSetChildObj[];
+}
+
+// 21. 캠페인 상세 응답 아이템 (/api/v1/dash-ad/{id}/detail/{campaignId} 응답)
+export interface DashAdCampaignDetailItem {
+  dashAdCampaign: DashAdCampaign;
+  dashAdAccount: DashAdAccount;
+  adDetailResponseObjs: AdDetailResponseObj[];
 }

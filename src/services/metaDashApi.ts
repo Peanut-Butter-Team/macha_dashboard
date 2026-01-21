@@ -10,6 +10,8 @@ import type {
   DashAdAccountWithInsights,
   DashInfluencer,
   DashInfluencerDetailResponse,
+  DashAdListItem,
+  DashAdCampaignDetailItem,
 } from '../types/metaDash';
 
 const BASE_URL = 'https://matcha.pnutbutter.kr';
@@ -165,4 +167,25 @@ export async function fetchDashInfluencerDetail(
     `/api/v1/dash-influencers/${influencerId}`
   );
   return response.result?.[0] || null;
+}
+
+// 10. 광고 캠페인 목록 조회
+export async function fetchDashAdList(
+  dashMemberId: string
+): Promise<DashAdListItem[]> {
+  const response = await fetchMetaDash<MetaDashResponse<DashAdListItem[]>>(
+    `/api/v1/dash-ad/my-list/${dashMemberId}`
+  );
+  return response.result || [];
+}
+
+// 11. 광고 캠페인 상세 조회
+export async function fetchDashAdCampaignDetail(
+  dashMemberId: string,
+  dashAdCampaignId: string
+): Promise<DashAdCampaignDetailItem[]> {
+  const response = await fetchMetaDash<MetaDashResponse<DashAdCampaignDetailItem[]>>(
+    `/api/v1/dash-ad/${dashMemberId}/detail/${dashAdCampaignId}`
+  );
+  return response.result || [];
 }

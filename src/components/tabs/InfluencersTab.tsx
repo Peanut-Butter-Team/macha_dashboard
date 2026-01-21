@@ -24,8 +24,9 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
     loadDetail();
   }, [influencer.id]);
 
-  // 숫자 포맷팅
-  const formatNumber = (num: number) => {
+  // 숫자 포맷팅 (null 처리 포함)
+  const formatNumber = (num: number | null | undefined) => {
+    if (num == null) return '-';
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
@@ -34,6 +35,10 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
   // 최근 게시물 (최대 10개)
   const latestPosts = detail?.dashInfluencerDetail?.latestPosts?.slice(0, 10) || [];
 
+  // 상세 API 데이터 우선 사용 (폴백: 목록 API 데이터)
+  const profileImage = detail?.dashInfluencerDetail?.profilePicUrl ?? influencer.profileImageUrl;
+  const followersCount = detail?.dashInfluencerDetail?.followersCount ?? influencer.followerCount;
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
       {/* 상단: 프로필 영역 */}
@@ -41,9 +46,9 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
         <div className="flex items-center gap-4">
           {/* 프로필 이미지 */}
           <div className="flex-shrink-0">
-            {influencer.profileImage ? (
+            {profileImage ? (
               <img
-                src={influencer.profileImage}
+                src={profileImage}
                 alt={influencer.name}
                 className="w-16 h-16 rounded-full object-cover bg-slate-100 ring-2 ring-slate-100"
                 onError={(e) => {
@@ -54,7 +59,7 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
               />
             ) : null}
             <div
-              className={`w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center text-white text-xl font-bold ring-2 ring-slate-100 ${influencer.profileImage ? 'hidden' : ''}`}
+              className={`w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center text-white text-xl font-bold ring-2 ring-slate-100 ${profileImage ? 'hidden' : ''}`}
             >
               {influencer.name.charAt(0).toUpperCase()}
             </div>
@@ -70,15 +75,15 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
             </div>
 
             {/* 인스타그램 핸들 (클릭 시 프로필 이동) */}
-            {influencer.handle && (
+            {influencer.username && (
               <a
-                href={`https://instagram.com/${influencer.handle}`}
+                href={`https://instagram.com/${influencer.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-pink-600 transition-colors"
               >
                 <Instagram size={14} />
-                <span>@{influencer.handle}</span>
+                <span>@{influencer.username}</span>
                 <ExternalLink size={12} />
               </a>
             )}
@@ -86,10 +91,10 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
             {/* 팔로워 & 참여율 배지 */}
             <div className="flex items-center gap-3 mt-2">
               <span className="text-sm font-semibold text-slate-700">
-                {formatNumber(influencer.followers)} 팔로워
+                {formatNumber(followersCount)} 팔로워
               </span>
               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
-                ER {influencer.engagementRate.toFixed(1)}%
+                ER {influencer.engagementRate?.toFixed(1) ?? '-'}%
               </span>
             </div>
           </div>
@@ -159,14 +164,14 @@ function InfluencerCard({ influencer }: { influencer: DashInfluencer }) {
           <div className="text-xs text-slate-500 mb-1">평균 좋아요</div>
           <div className="font-bold text-slate-900 flex items-center justify-center gap-1">
             <Heart size={14} className="text-red-500" />
-            {formatNumber(influencer.avgLikes)}
+            {formatNumber(influencer.averageLikes)}
           </div>
         </div>
         <div>
           <div className="text-xs text-slate-500 mb-1">평균 댓글</div>
           <div className="font-bold text-slate-900 flex items-center justify-center gap-1">
             <MessageCircle size={14} className="text-blue-500" />
-            {formatNumber(influencer.avgComments)}
+            {formatNumber(influencer.averageComments)}
           </div>
         </div>
         <div>
@@ -212,7 +217,7 @@ export function InfluencersTab() {
   const filteredInfluencers = influencers.filter((inf) => {
     const matchesSearch =
       inf.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inf.handle.toLowerCase().includes(searchQuery.toLowerCase());
+      (inf.username ?? '').toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory =
       categoryFilter === 'all' || inf.category.includes(categoryFilter);
