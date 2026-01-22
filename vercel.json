@@ -68,6 +68,10 @@
       "destination": "/api/sync-instagram-data.js"
     },
     {
+      "source": "/api/image-proxy",
+      "destination": "/api/image-proxy.js"
+    },
+    {
       "source": "/assets/:path*",
       "destination": "/dist/assets/:path*"
     },

@@ -7,8 +7,6 @@
  * TODO: 장기적으로 Apify 수집 시 이미지를 S3/Cloudinary에 저장하는 방식으로 전환 필요
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 /**
  * 이미지 URL을 프록시 URL로 변환
  *
@@ -18,9 +16,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 export function getProxiedImageUrl(url: string | null | undefined): string {
   if (!url) return '';
 
-  // Instagram CDN URL인 경우 프록시 사용
+  // Instagram CDN URL인 경우 프록시 사용 (상대 경로로 요청)
   if (url.includes('cdninstagram.com') || url.includes('instagram.com') || url.includes('fbcdn.net')) {
-    return `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(url)}`;
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
 
   return url;
