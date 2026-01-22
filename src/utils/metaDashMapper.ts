@@ -23,11 +23,8 @@ import type {
   AdWithPerformance,
 } from '../types';
 import { calculateCtr, calculateCpc, calculateFrequency, calculateGrowth } from './metrics';
-
-// 로컬 시간 기준 날짜 문자열 반환 (YYYY-MM-DD)
-function getLocalDateString(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
+import { getLocalDateString, formatDateToMMDD } from './dates';
+import { getCountryName, mapMediaType, mapAdStatus } from './converters';
 
 // 1. 프로필 인사이트 변환
 export function mapToProfileInsight(
@@ -311,48 +308,6 @@ function findInsightValue(
   return insights.find(i => i.name === metricName)?.value;
 }
 
-function mapMediaType(apiType: string): 'reels' | 'feed' | 'story' | 'carousel' {
-  const normalized = (apiType || '').toUpperCase();
-  if (normalized.includes('REEL')) return 'reels';
-  if (normalized.includes('VIDEO')) return 'reels';      // VIDEO → reels
-  if (normalized.includes('CAROUSEL')) return 'carousel'; // CAROUSEL → carousel
-  if (normalized.includes('STORY')) return 'story';
-  return 'feed';  // IMAGE → feed
-}
-
-function formatDateToMMDD(isoDate: string): string {
-  const date = new Date(isoDate);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return `${month}/${day}`;
-}
-
-function getCountryName(code: string): string {
-  const countryNames: Record<string, string> = {
-    KR: '한국',
-    US: '미국',
-    JP: '일본',
-    CN: '중국',
-    TW: '대만',
-    HK: '홍콩',
-    SG: '싱가포르',
-    TH: '태국',
-    VN: '베트남',
-    ID: '인도네시아',
-    PH: '필리핀',
-    MY: '말레이시아',
-    IN: '인도',
-    AU: '호주',
-    GB: '영국',
-    DE: '독일',
-    FR: '프랑스',
-    CA: '캐나다',
-    BR: '브라질',
-    MX: '멕시코',
-  };
-  return countryNames[code] || code;
-}
-
 // 5. 광고 성과 변환 (모든 광고 계정의 인사이트 합산)
 export function mapToAdPerformance(
   accountsWithInsights: DashAdAccountWithInsights[]
@@ -530,14 +485,6 @@ export function mapToCampaignPerformance(
       startDate: earliestTime,
     };
   });
-}
-
-// 광고 상태 매핑
-function mapAdStatus(apiStatus: string): 'active' | 'paused' | 'completed' {
-  const s = (apiStatus || '').toUpperCase();
-  if (s === 'ACTIVE') return 'active';
-  if (s === 'PAUSED') return 'paused';
-  return 'completed';
 }
 
 // 8. 캠페인 계층 구조 변환 (캠페인 → 광고세트 → 광고 성과 합산)
