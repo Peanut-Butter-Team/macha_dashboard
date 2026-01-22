@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Search, Users, Instagram, Heart, MessageCircle, X, Eye, Send, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, Search, Users, Instagram, Heart, MessageCircle, X, Eye, Send, ChevronUp, ChevronDown, Calendar, Play } from 'lucide-react';
 import { fetchDashInfluencersWithDetail } from '../../services/metaDashApi';
 import type { DashInfluencerWithDetail, DashInfluencerPost } from '../../types/metaDash';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
@@ -313,7 +313,8 @@ function InfluencerDetailModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [sortBy, setSortBy] = useState<'popular' | 'comments' | 'latest'>('popular');
+  const [feedSortBy, setFeedSortBy] = useState<'popular' | 'comments' | 'latest'>('popular');
+  const [reelsSortBy, setReelsSortBy] = useState<'popular' | 'views' | 'latest'>('popular');
 
   if (!isOpen || !item) return null;
 
@@ -321,10 +322,27 @@ function InfluencerDetailModal({
   const detail = item.dashInfluencerDetail;
   const allPosts = detail?.latestPosts || [];
 
-  // 정렬된 게시물
-  const sortedPosts = [...allPosts].sort((a, b) => {
-    if (sortBy === 'popular') return (b.likesCount || 0) - (a.likesCount || 0);
-    if (sortBy === 'comments') return (b.commentsCount || 0) - (a.commentsCount || 0);
+  // 피드 (이미지/캐러셀) 게시물
+  const feedPosts = allPosts.filter(p =>
+    p.productType !== 'reels' && p.type !== 'Video'
+  );
+
+  // 릴스 게시물
+  const reelsPosts = allPosts.filter(p =>
+    p.productType === 'reels' || p.type === 'Video'
+  );
+
+  // 피드 정렬
+  const sortedFeedPosts = [...feedPosts].sort((a, b) => {
+    if (feedSortBy === 'popular') return (b.likesCount || 0) - (a.likesCount || 0);
+    if (feedSortBy === 'comments') return (b.commentsCount || 0) - (a.commentsCount || 0);
+    return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+  });
+
+  // 릴스 정렬
+  const sortedReelsPosts = [...reelsPosts].sort((a, b) => {
+    if (reelsSortBy === 'popular') return (b.likesCount || 0) - (a.likesCount || 0);
+    if (reelsSortBy === 'views') return (b.videoViewCount || 0) - (a.videoViewCount || 0);
     return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
   });
 
@@ -336,8 +354,7 @@ function InfluencerDetailModal({
     ? Math.round(allPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / allPosts.length)
     : 0;
 
-  // 릴스 통계
-  const reelsPosts = allPosts.filter(p => p.type === 'Video' || p.productType === 'reels');
+  // 릴스 통계 (위에서 선언한 reelsPosts 사용)
   const avgReelsViews = reelsPosts.length > 0
     ? Math.round(reelsPosts.reduce((sum, p) => sum + (p.videoViewCount || 0), 0) / reelsPosts.length)
     : 0;
@@ -486,18 +503,17 @@ function InfluencerDetailModal({
             </div>
           </div>
 
-          {/* 섹션 4: 최근 콘텐츠 */}
-          <div className="px-6 py-4">
+          {/* 섹션 4-1: 피드 콘텐츠 */}
+          <div className="px-6 py-4 border-b border-slate-100">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900">새롭게 등록된 콘텐츠에요</h3>
+              <h3 className="font-semibold text-slate-900">피드 콘텐츠</h3>
               <div className="flex items-center gap-4 text-sm text-slate-600">
-                <span>릴스 평균 조회수 <strong>{formatNumber(avgReelsViews)}</strong> 회</span>
-                <span>평균 좋아요 <strong>{formatNumber(avgLikes)}</strong> 개</span>
-                <span>평균 댓글 <strong>{formatNumber(avgComments)}</strong> 개</span>
+                <span>평균 좋아요 <strong>{formatNumber(feedPosts.length > 0 ? Math.round(feedPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / feedPosts.length) : 0)}</strong> 개</span>
+                <span>평균 댓글 <strong>{formatNumber(feedPosts.length > 0 ? Math.round(feedPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / feedPosts.length) : 0)}</strong> 개</span>
               </div>
             </div>
 
-            {/* 정렬 탭 */}
+            {/* 피드 정렬 탭 */}
             <div className="flex border-b border-slate-200 mb-3">
               {[
                 { key: 'popular', label: '인기순' },
@@ -506,9 +522,9 @@ function InfluencerDetailModal({
               ].map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setSortBy(tab.key as typeof sortBy)}
+                  onClick={() => setFeedSortBy(tab.key as typeof feedSortBy)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    sortBy === tab.key
+                    feedSortBy === tab.key
                       ? 'border-orange-500 text-orange-600'
                       : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
@@ -518,9 +534,9 @@ function InfluencerDetailModal({
               ))}
             </div>
 
-            {/* 게시물 그리드 */}
+            {/* 피드 게시물 그리드 */}
             <div className="grid grid-cols-5 gap-2">
-              {sortedPosts.slice(0, 20).map((post, idx) => (
+              {sortedFeedPosts.slice(0, 15).map((post, idx) => (
                 <a
                   key={post.id || idx}
                   href={post.url || `https://instagram.com/p/${post.shortCode}`}
@@ -549,10 +565,10 @@ function InfluencerDetailModal({
                         <MessageCircle size={12} fill="white" />
                         <span>{formatNumber(post.commentsCount || 0)}</span>
                       </div>
-                      {post.videoViewCount && (
+                      {post.timestamp && (
                         <div className="flex items-center justify-center gap-1">
-                          <Eye size={12} />
-                          <span>{formatNumber(post.videoViewCount)}</span>
+                          <Calendar size={12} />
+                          <span>{new Date(post.timestamp).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
                         </div>
                       )}
                     </div>
@@ -561,9 +577,99 @@ function InfluencerDetailModal({
               ))}
             </div>
 
-            {sortedPosts.length === 0 && (
+            {sortedFeedPosts.length === 0 && (
               <div className="text-center py-8 text-slate-400">
-                등록된 콘텐츠가 없어요
+                등록된 피드 콘텐츠가 없어요
+              </div>
+            )}
+          </div>
+
+          {/* 섹션 4-2: 릴스 콘텐츠 */}
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900">릴스 콘텐츠</h3>
+              <div className="flex items-center gap-4 text-sm text-slate-600">
+                <span>평균 조회수 <strong>{formatNumber(avgReelsViews)}</strong> 회</span>
+                <span>평균 좋아요 <strong>{formatNumber(reelsPosts.length > 0 ? Math.round(reelsPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / reelsPosts.length) : 0)}</strong> 개</span>
+                <span>평균 댓글 <strong>{formatNumber(reelsPosts.length > 0 ? Math.round(reelsPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / reelsPosts.length) : 0)}</strong> 개</span>
+              </div>
+            </div>
+
+            {/* 릴스 정렬 탭 */}
+            <div className="flex border-b border-slate-200 mb-3">
+              {[
+                { key: 'views', label: '조회수순' },
+                { key: 'popular', label: '좋아요순' },
+                { key: 'latest', label: '최신순' }
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setReelsSortBy(tab.key as typeof reelsSortBy)}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    reelsSortBy === tab.key
+                      ? 'border-violet-500 text-violet-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 릴스 게시물 그리드 */}
+            <div className="grid grid-cols-5 gap-2">
+              {sortedReelsPosts.slice(0, 15).map((post, idx) => (
+                <a
+                  key={post.id || idx}
+                  href={post.url || `https://instagram.com/p/${post.shortCode}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative aspect-square"
+                >
+                  <img
+                    src={getProxiedImageUrl(post.displayUrl || post.images?.[0])}
+                    alt={`Reels ${idx + 1}`}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover rounded-lg bg-slate-200"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="%23e2e8f0"><rect width="100" height="100"/></svg>';
+                    }}
+                  />
+                  {/* 릴스 아이콘 표시 */}
+                  <div className="absolute top-2 right-2 bg-black/50 rounded-full p-1">
+                    <Play size={12} fill="white" className="text-white" />
+                  </div>
+                  {/* 호버 시 정보 */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                    <div className="text-white text-xs text-center space-y-1">
+                      <div className="flex items-center justify-center gap-1">
+                        <Eye size={12} />
+                        <span>{formatNumber(post.videoViewCount || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-1">
+                        <Heart size={12} fill="white" />
+                        <span>{formatNumber(post.likesCount || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-1">
+                        <MessageCircle size={12} fill="white" />
+                        <span>{formatNumber(post.commentsCount || 0)}</span>
+                      </div>
+                      {post.timestamp && (
+                        <div className="flex items-center justify-center gap-1">
+                          <Calendar size={12} />
+                          <span>{new Date(post.timestamp).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            {sortedReelsPosts.length === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                등록된 릴스 콘텐츠가 없어요
               </div>
             )}
           </div>
