@@ -719,40 +719,93 @@ export function mapToAdPerformanceFromCampaignDetail(
 }
 
 // 10. 캠페인 상세 응답에서 일별 광고 데이터 변환
+// KPI 카드 함수(mapToAdPerformanceFromCampaignDetail)와 동일한 3단계 중복 제거 적용
 export function mapToDailyAdDataFromCampaignDetail(
   campaignDetails: DashAdCampaignDetailItem[]
 ): DailyAdData[] {
-  // 모든 광고 인사이트 추출
-  const allInsights: DashAdAccountInsight[] = campaignDetails
-    .flatMap(detail => detail.adDetailResponseObjs || [])
-    .flatMap(adDetailObj => adDetailObj.adSetChildObjs || [])
-    .map(child => child.dashAdAccountInsight)
-    .filter(Boolean);
+  // 1. 캠페인 중복 제거 (metaId 기준) - KPI 카드 함수와 동일
+  const campaignMap = new Map<string, DashAdCampaignDetailItem>();
+  for (const detail of campaignDetails) {
+    const campaignId = detail.dashAdCampaign.metaId;
+    const existing = campaignMap.get(campaignId);
+    if (!existing) {
+      campaignMap.set(campaignId, detail);
+    } else {
+      // 광고세트 병합
+      const mergedAdSets = [...(existing.adDetailResponseObjs || [])];
+      for (const newAdSet of (detail.adDetailResponseObjs || [])) {
+        const alreadyExists = mergedAdSets.some(
+          s => s.dashAdSet.metaAdSetId === newAdSet.dashAdSet.metaAdSetId
+        );
+        if (!alreadyExists) {
+          mergedAdSets.push(newAdSet);
+        }
+      }
+      campaignMap.set(campaignId, { ...detail, adDetailResponseObjs: mergedAdSets });
+    }
+  }
 
-  if (allInsights.length === 0) {
+  // 2. 날짜별 합계 (중복 제거된 데이터 사용)
+  const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number }>();
+
+  for (const detail of campaignMap.values()) {
+    // 광고세트 중복 제거 (metaAdSetId 기준)
+    const adSetMap = new Map<string, typeof detail.adDetailResponseObjs[0]>();
+    for (const adDetailObj of (detail.adDetailResponseObjs || [])) {
+      const metaAdSetId = adDetailObj.dashAdSet.metaAdSetId;
+      const existing = adSetMap.get(metaAdSetId);
+      if (!existing) {
+        adSetMap.set(metaAdSetId, adDetailObj);
+      } else {
+        // 소재 병합
+        const mergedChildObjs = [...(existing.adSetChildObjs || [])];
+        for (const newChild of (adDetailObj.adSetChildObjs || [])) {
+          const alreadyExists = mergedChildObjs.some(
+            c => c.dashAdDetailEntity?.adId === newChild.dashAdDetailEntity?.adId
+          );
+          if (!alreadyExists) {
+            mergedChildObjs.push(newChild);
+          }
+        }
+        adSetMap.set(metaAdSetId, { ...adDetailObj, adSetChildObjs: mergedChildObjs });
+      }
+    }
+
+    // 소재 중복 제거 후 날짜별 합산
+    for (const adDetailObj of adSetMap.values()) {
+      // 소재 중복 제거 (adId + date 기준)
+      const adMap = new Map<string, typeof adDetailObj.adSetChildObjs[0]>();
+      for (const child of (adDetailObj.adSetChildObjs || [])) {
+        const adId = child.dashAdDetailEntity?.adId;
+        const dateStr = child.dashAdAccountInsight?.time?.split('T')[0];
+        const key = `${adId}_${dateStr}`;
+        if (adId && dateStr && !adMap.has(key)) {
+          adMap.set(key, child);
+        }
+      }
+
+      // 중복 제거된 인사이트만 합산
+      for (const child of adMap.values()) {
+        const insight = child.dashAdAccountInsight;
+        if (!insight) continue;
+
+        const dateStr = insight.time.split('T')[0];
+        const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0 };
+        dateMap.set(dateStr, {
+          spend: existing.spend + insight.spend,
+          impressions: existing.impressions + insight.impressions,
+          clicks: existing.clicks + insight.clicks,
+          reach: existing.reach + insight.reach,
+        });
+      }
+    }
+  }
+
+  if (dateMap.size === 0) {
     return [];
   }
 
-  // 날짜별 그룹핑 및 합계
-  const dateMap = new Map<string, {
-    spend: number;
-    impressions: number;
-    clicks: number;
-    reach: number;
-  }>();
-
-  for (const insight of allInsights) {
-    const dateStr = insight.time.split('T')[0];
-    const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0 };
-    dateMap.set(dateStr, {
-      spend: existing.spend + insight.spend,
-      impressions: existing.impressions + insight.impressions,
-      clicks: existing.clicks + insight.clicks,
-      reach: existing.reach + insight.reach,
-    });
-  }
-
-  // 날짜순 정렬 후 변환 (최근 14일)
+  // 3. 날짜순 정렬 후 변환 (최근 14일)
   return Array.from(dateMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-14)
