@@ -684,11 +684,21 @@ export function InfluencersTab() {
   const [influencersWithDetail, setInfluencersWithDetail] = useState<DashInfluencerWithDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [followerFilter, setFollowerFilter] = useState<string>('all');
-  const [engagementFilter, setEngagementFilter] = useState<string>('all');
-  const [activityFilter, setActivityFilter] = useState<string>('all');
+  // 임시 필터 상태 (UI에 바인딩)
+  const [tempSearchQuery, setTempSearchQuery] = useState('');
+  const [tempCategoryFilter, setTempCategoryFilter] = useState<string>('all');
+  const [tempFollowerFilter, setTempFollowerFilter] = useState<string>('all');
+  const [tempEngagementFilter, setTempEngagementFilter] = useState<string>('all');
+  const [tempActivityFilter, setTempActivityFilter] = useState<string>('all');
+
+  // 적용된 필터 상태 (실제 필터링에 사용)
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: '',
+    category: 'all',
+    follower: 'all',
+    engagement: 'all',
+    activity: 'all'
+  });
 
   // 정렬 상태 (기본: 팔로워수 내림차순)
   const [sortField, setSortField] = useState<SortField | null>('followerCount');
@@ -724,6 +734,35 @@ export function InfluencersTab() {
     }
   };
 
+  // 검색 핸들러 - 임시 필터를 적용 상태로 복사
+  const handleSearch = () => {
+    setAppliedFilters({
+      search: tempSearchQuery,
+      category: tempCategoryFilter,
+      follower: tempFollowerFilter,
+      engagement: tempEngagementFilter,
+      activity: tempActivityFilter
+    });
+    setCurrentPage(1);
+  };
+
+  // 초기화 핸들러 - 임시 상태와 적용 상태 모두 초기화
+  const handleReset = () => {
+    setTempSearchQuery('');
+    setTempCategoryFilter('all');
+    setTempFollowerFilter('all');
+    setTempEngagementFilter('all');
+    setTempActivityFilter('all');
+    setAppliedFilters({
+      search: '',
+      category: 'all',
+      follower: 'all',
+      engagement: 'all',
+      activity: 'all'
+    });
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     const loadInfluencers = async () => {
       try {
@@ -742,12 +781,7 @@ export function InfluencersTab() {
     loadInfluencers();
   }, []);
 
-  // 검색/필터 변경 시 페이지 초기화
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, categoryFilter, followerFilter, engagementFilter, activityFilter]);
-
-  // 검색 및 필터링
+  // 검색 및 필터링 (appliedFilters 사용)
   const filteredInfluencers = influencersWithDetail.filter((item) => {
     const inf = item.dashInfluencer;
     const detail = item.dashInfluencerDetail;
@@ -755,31 +789,31 @@ export function InfluencersTab() {
 
     // 검색 필터
     const matchesSearch =
-      inf.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (inf.username ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+      inf.name.toLowerCase().includes(appliedFilters.search.toLowerCase()) ||
+      (inf.username ?? '').toLowerCase().includes(appliedFilters.search.toLowerCase());
 
     // 카테고리 필터
     const matchesCategory =
-      categoryFilter === 'all' || (inf.category?.includes(categoryFilter) ?? false);
+      appliedFilters.category === 'all' || (inf.category?.includes(appliedFilters.category) ?? false);
 
     // 팔로워수 필터
     const followerCount = detail?.followersCount || inf.followerCount || 0;
     let matchesFollower = true;
-    if (followerFilter === 'under1k') matchesFollower = followerCount < 1000;
-    else if (followerFilter === '1k-10k') matchesFollower = followerCount >= 1000 && followerCount < 10000;
-    else if (followerFilter === '10k-50k') matchesFollower = followerCount >= 10000 && followerCount < 50000;
-    else if (followerFilter === '50k-100k') matchesFollower = followerCount >= 50000 && followerCount < 100000;
-    else if (followerFilter === 'over100k') matchesFollower = followerCount >= 100000;
+    if (appliedFilters.follower === 'under1k') matchesFollower = followerCount < 1000;
+    else if (appliedFilters.follower === '1k-10k') matchesFollower = followerCount >= 1000 && followerCount < 10000;
+    else if (appliedFilters.follower === '10k-50k') matchesFollower = followerCount >= 10000 && followerCount < 50000;
+    else if (appliedFilters.follower === '50k-100k') matchesFollower = followerCount >= 50000 && followerCount < 100000;
+    else if (appliedFilters.follower === 'over100k') matchesFollower = followerCount >= 100000;
 
     // 참여율 필터
     const avgLikes = posts.length > 0 ? posts.reduce((s, p) => s + (p.likesCount || 0), 0) / posts.length : 0;
     const avgComments = posts.length > 0 ? posts.reduce((s, p) => s + (p.commentsCount || 0), 0) / posts.length : 0;
     const engagementRate = followerCount > 0 ? ((avgLikes + avgComments) / followerCount) * 100 : 0;
     let matchesEngagement = true;
-    if (engagementFilter === 'over1') matchesEngagement = engagementRate >= 1;
-    else if (engagementFilter === 'over3') matchesEngagement = engagementRate >= 3;
-    else if (engagementFilter === 'over5') matchesEngagement = engagementRate >= 5;
-    else if (engagementFilter === 'over10') matchesEngagement = engagementRate >= 10;
+    if (appliedFilters.engagement === 'over1') matchesEngagement = engagementRate >= 1;
+    else if (appliedFilters.engagement === 'over3') matchesEngagement = engagementRate >= 3;
+    else if (appliedFilters.engagement === 'over5') matchesEngagement = engagementRate >= 5;
+    else if (appliedFilters.engagement === 'over10') matchesEngagement = engagementRate >= 10;
 
     // 최근 활동 필터
     const latestPostTime = posts.length > 0 ? Math.max(...posts.map(p => new Date(p.timestamp).getTime())) : 0;
@@ -788,9 +822,9 @@ export function InfluencersTab() {
     const oneMonth = 30 * 24 * 60 * 60 * 1000;
     const threeMonths = 90 * 24 * 60 * 60 * 1000;
     let matchesActivity = true;
-    if (activityFilter === 'week') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= oneWeek;
-    else if (activityFilter === 'month') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= oneMonth;
-    else if (activityFilter === '3months') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= threeMonths;
+    if (appliedFilters.activity === 'week') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= oneWeek;
+    else if (appliedFilters.activity === 'month') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= oneMonth;
+    else if (appliedFilters.activity === '3months') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= threeMonths;
 
     return matchesSearch && matchesCategory && matchesFollower && matchesEngagement && matchesActivity;
   });
@@ -898,8 +932,8 @@ export function InfluencersTab() {
         <div className="flex flex-wrap items-center gap-2">
           {/* 카테고리 */}
           <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            value={tempCategoryFilter}
+            onChange={(e) => setTempCategoryFilter(e.target.value)}
             className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
           >
             <option value="all">전체 카테고리</option>
@@ -912,8 +946,8 @@ export function InfluencersTab() {
 
           {/* 팔로워수 */}
           <select
-            value={followerFilter}
-            onChange={(e) => setFollowerFilter(e.target.value)}
+            value={tempFollowerFilter}
+            onChange={(e) => setTempFollowerFilter(e.target.value)}
             className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
           >
             <option value="all">전체 팔로워</option>
@@ -926,8 +960,8 @@ export function InfluencersTab() {
 
           {/* 참여율 */}
           <select
-            value={engagementFilter}
-            onChange={(e) => setEngagementFilter(e.target.value)}
+            value={tempEngagementFilter}
+            onChange={(e) => setTempEngagementFilter(e.target.value)}
             className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
           >
             <option value="all">전체 참여율</option>
@@ -939,8 +973,8 @@ export function InfluencersTab() {
 
           {/* 최근 활동 */}
           <select
-            value={activityFilter}
-            onChange={(e) => setActivityFilter(e.target.value)}
+            value={tempActivityFilter}
+            onChange={(e) => setTempActivityFilter(e.target.value)}
             className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
           >
             <option value="all">전체 활동</option>
@@ -949,28 +983,31 @@ export function InfluencersTab() {
             <option value="3months">3달 이내</option>
           </select>
 
-          {/* 검색 */}
+          {/* 검색 입력창 */}
           <div className="flex-1 relative max-w-xs">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="이름 또는 핸들 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={tempSearchQuery}
+              onChange={(e) => setTempSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
             />
           </div>
 
+          {/* 검색 버튼 */}
+          <button
+            onClick={handleSearch}
+            className="px-4 py-1.5 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+          >
+            검색
+          </button>
+
           {/* 초기화 */}
-          {(searchQuery || categoryFilter !== 'all' || followerFilter !== 'all' || engagementFilter !== 'all' || activityFilter !== 'all') && (
+          {(appliedFilters.search !== '' || appliedFilters.category !== 'all' || appliedFilters.follower !== 'all' || appliedFilters.engagement !== 'all' || appliedFilters.activity !== 'all') && (
             <button
-              onClick={() => {
-                setSearchQuery('');
-                setCategoryFilter('all');
-                setFollowerFilter('all');
-                setEngagementFilter('all');
-                setActivityFilter('all');
-              }}
+              onClick={handleReset}
               className="px-3 py-1.5 text-sm text-orange-500 hover:text-orange-600 font-medium"
             >
               초기화
