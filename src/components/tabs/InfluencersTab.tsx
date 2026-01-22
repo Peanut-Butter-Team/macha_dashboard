@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Search, Users, Heart, MessageCircle, X, Eye, Send, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, Search, Users, Instagram, Heart, MessageCircle, X, Eye, Send, ChevronUp, ChevronDown } from 'lucide-react';
 import { fetchDashInfluencersWithDetail } from '../../services/metaDashApi';
 import type { DashInfluencerWithDetail, DashInfluencerPost } from '../../types/metaDash';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
