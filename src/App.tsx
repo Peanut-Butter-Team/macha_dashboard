@@ -78,10 +78,10 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
   const [syncing, setSyncing] = useState(false);
 
   // API 데이터 (Custom Hooks)
-  const { data: profileData, loading: profileLoading, refetch: refetchProfile, lastUpdated } = useProfileInsight();
+  const { data: profileData, loading: profileLoading, refetch: refetchProfile, serverSyncTime: serverProfileSyncTime } = useProfileInsight();
   const { data: dailyProfileData, loading: dailyProfileLoading, refetch: refetchDailyProfile } = useDailyProfileData(period);
   const { data: adData, loading: adLoading, refetch: refetchAd } = useAdPerformance(user.id);
-  const { data: dailyAdData, loading: dailyAdLoading, refetch: refetchDailyAd } = useDailyAdData(period, user.id);
+  const { data: dailyAdData, loading: dailyAdLoading, refetch: refetchDailyAd, serverSyncTime: serverAdSyncTime } = useDailyAdData(period, user.id);
   const { data: influencers, loading: influencersLoading } = useInfluencers();
   const { data: seedingList, loading: seedingLoading } = useSeedingList();
 
@@ -109,9 +109,10 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
       console.log('프로필 데이터 동기화 시작...');
 
       // Sync API 호출 (Meta Dash)
+      let syncSuccess = false;
       if (user?.id) {
-        const syncResult = await syncDashMember(user.id);
-        console.log('프로필 동기화 결과:', syncResult);
+        syncSuccess = await syncDashMember(user.id);
+        console.log('프로필 동기화 결과:', syncSuccess);
       }
 
       // 프로필 관련 데이터 새로고침
@@ -139,9 +140,10 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
       console.log('광고 데이터 동기화 시작...');
 
       // Sync API 호출 (광고 전용)
+      let syncSuccess = false;
       if (user?.id) {
-        const syncResult = await syncDashAd(user.id);
-        console.log('광고 동기화 결과:', syncResult);
+        syncSuccess = await syncDashAd(user.id);
+        console.log('광고 동기화 결과:', syncSuccess);
       }
 
       // 광고 관련 데이터 새로고침
@@ -293,11 +295,11 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
               onCustomDateChange={(start, end) => setCustomDateRange({ start, end })}
             />
 
-            {/* Last Updated & Sync Button - 프로필/광고 탭에서만 표시 */}
+            {/* Last Sync Time & Sync Button - 프로필/광고 탭에서만 표시 */}
             <div className="flex items-center gap-3">
-              {lastUpdated && (
+              {(activeTab === 'profile' ? serverProfileSyncTime : serverAdSyncTime) && (
                 <div className="text-sm text-slate-500">
-                  마지막 업데이트: {lastUpdated.toLocaleString('ko-KR')}
+                  마지막 동기화: {(activeTab === 'profile' ? serverProfileSyncTime : serverAdSyncTime)?.toLocaleString('ko-KR')}
                 </div>
               )}
               {(activeTab === 'profile' || activeTab === 'ads') && (

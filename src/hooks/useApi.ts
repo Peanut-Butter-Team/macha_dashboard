@@ -57,6 +57,7 @@ interface ApiResponse<T> {
   error: string | null;
   refetch: () => void;
   lastUpdated: Date | null;
+  serverSyncTime?: Date | null;  // 서버 동기화 시간 (API에서 추출)
 }
 
 // 공통 fetch 함수 (실제 API 연동 시 사용)
@@ -91,6 +92,7 @@ export function useProfileInsight(): ApiResponse<ProfileInsight> {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [serverSyncTime, setServerSyncTime] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) {
@@ -108,6 +110,14 @@ export function useProfileInsight(): ApiResponse<ProfileInsight> {
         fetchDashMemberInsight(user.id),
         fetchDashFollowers(user.id),
       ]);
+
+      // 서버 동기화 시간 추출 (가장 최근 collectedAt)
+      if (insights.length > 0) {
+        const latestSyncTime = insights
+          .map(item => new Date(item.collectedAt))
+          .sort((a, b) => b.getTime() - a.getTime())[0];
+        setServerSyncTime(latestSyncTime);
+      }
 
       // 데이터 변환
       const profileData = mapToProfileInsight(insights, followers);
@@ -128,7 +138,7 @@ export function useProfileInsight(): ApiResponse<ProfileInsight> {
     fetchData();
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData, lastUpdated };
+  return { data, loading, error, refetch: fetchData, lastUpdated, serverSyncTime };
 }
 
 // ============================================
@@ -258,6 +268,7 @@ export function useDailyAdData(period: string, userId?: string): ApiResponse<Dai
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [serverSyncTime, setServerSyncTime] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!userId) {
@@ -282,7 +293,23 @@ export function useDailyAdData(period: string, userId?: string): ApiResponse<Dai
       // 3. 모든 상세 데이터 합치기
       const allCampaignDetails = campaignDetailsResults.flat();
 
-      // 4. 데이터 변환
+      // 4. 서버 동기화 시간 추출 (가장 최근 lastSyncedAt)
+      const syncTimes: Date[] = [];
+      allCampaignDetails.forEach(detail => {
+        detail.adDetailResponseObjs?.forEach(adDetail => {
+          adDetail.adSetChildObjs?.forEach(child => {
+            if (child.dashAdAccountInsight?.lastSyncedAt) {
+              syncTimes.push(new Date(child.dashAdAccountInsight.lastSyncedAt));
+            }
+          });
+        });
+      });
+      if (syncTimes.length > 0) {
+        const latestSyncTime = syncTimes.sort((a, b) => b.getTime() - a.getTime())[0];
+        setServerSyncTime(latestSyncTime);
+      }
+
+      // 5. 데이터 변환
       const dailyData = mapToDailyAdDataFromCampaignDetail(allCampaignDetails);
       setData(dailyData);
       setError(null);
@@ -301,7 +328,7 @@ export function useDailyAdData(period: string, userId?: string): ApiResponse<Dai
     fetchData();
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData, lastUpdated };
+  return { data, loading, error, refetch: fetchData, lastUpdated, serverSyncTime };
 }
 
 // ============================================
