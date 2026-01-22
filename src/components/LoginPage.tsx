@@ -39,7 +39,7 @@ export function LoginPage({ onRegister }: LoginPageProps) {
             <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
               <BarChart3 size={32} className="text-white" />
             </div>
-            <span className="font-bold text-3xl text-white">Macha</span>
+            <span className="font-bold text-3xl text-white">Wellink</span>
           </div>
           <p className="text-primary-300">브랜드 마케팅 대시보드</p>
         </div>
@@ -116,7 +116,7 @@ export function LoginPage({ onRegister }: LoginPageProps) {
 
         {/* Footer */}
         <p className="text-center text-primary-400 text-sm mt-6">
-          © 2024 Macha Dashboard. All rights reserved.
+          © 2026 Wellink Dashboard. All rights reserved.
         </p>
       </div>
     </div>

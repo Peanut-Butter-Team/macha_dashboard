@@ -202,8 +202,8 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
               </div>
               <div className="h-8 w-px bg-primary-700" />
               <div>
-                <div className="text-primary-300 text-sm">{user.brand?.client || user.name}</div>
-                <div className="font-semibold">{user.brand?.name || user.email}</div>
+                <div className="text-primary-300 text-sm">{user.managerName || user.email}</div>
+                <div className="font-semibold">{user.name || user.email}</div>
               </div>
             </div>
 
@@ -338,10 +338,10 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
           <AdsTab
             adData={adData?.adPerformance || null}
             dailyData={dailyAdData}
-            campaignData={adData?.campaignData || []}
-            campaignHierarchy={adData?.campaignHierarchy || []}
+            campaignList={adData?.campaignList || []}
             profileData={profileData}
             loading={isLoading.ads}
+            userId={user.id}
           />
         )}
 
@@ -362,10 +362,10 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 border-t border-slate-200">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <div>
-            © 2024 Wellink Dashboard. 데이터는 Instagram Graph API, Meta Ads API, 내부 DB와 실시간 연동됩니다.
+            © 2026 Wellink Dashboard. 데이터는 Instagram Graph API, Meta Ads API, 내부 DB와 실시간 연동됩니다.
           </div>
           <div className="flex items-center gap-4">
-            <span>문의: support@macha.io</span>
+            <span>문의: support@wellink.io</span>
           </div>
         </div>
       </footer>

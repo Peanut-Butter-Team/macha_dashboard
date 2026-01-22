@@ -13,6 +13,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  managerName?: string;
   igUserId?: string;
   igUserNickName?: string;
   metaAccessToken?: string;
@@ -60,8 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const apiUser = data.result[0];
         const user: User = {
           id: apiUser.id,
-          email: apiUser.userId,
-          name: apiUser.userId,
+          email: apiUser.email,
+          name: apiUser.name,
+          managerName: apiUser.managerName,
           igUserId: apiUser.igUserId,
           igUserNickName: apiUser.igUserNickName,
           metaAccessToken: apiUser.metaAccessToken,
