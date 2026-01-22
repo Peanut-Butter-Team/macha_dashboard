@@ -403,6 +403,42 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================
+// 이미지 프록시 API
+// ============================================
+
+app.get('/api/image-proxy', async (req, res) => {
+  try {
+    const { url } = req.query;
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL이 필요합니다.' });
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.instagram.com/',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).send('이미지를 불러올 수 없습니다.');
+    }
+
+    const contentType = response.headers.get('content-type');
+    res.setHeader('Content-Type', contentType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24시간 캐시
+
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('이미지 프록시 에러:', error);
+    res.status(500).json({ error: '이미지 프록시 오류' });
+  }
+});
+
+// ============================================
 // 서버 시작
 // ============================================
 
