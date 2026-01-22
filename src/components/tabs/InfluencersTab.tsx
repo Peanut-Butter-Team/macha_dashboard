@@ -7,6 +7,7 @@ import { getProxiedImageUrl } from '../../utils/imageProxy';
 // 숫자 포맷팅 (null 처리 포함)
 const formatNumber = (num: number | null | undefined) => {
   if (num == null) return '-';
+  if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)}B`;
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toLocaleString();
@@ -355,8 +356,20 @@ function InfluencerDetailModal({
     : 0;
 
   // 릴스 통계 (위에서 선언한 reelsPosts 사용)
+  // 비정상적으로 큰 조회수 값 필터링 (10억 이상은 데이터 오류로 간주)
+  const MAX_VALID_VIEW_COUNT = 1_000_000_000;
+  const getValidViewCount = (count: number | string | undefined | null) => {
+    // 숫자로 명시적 변환 (문자열 대응)
+    const value = Number(count) || 0;
+    // NaN, Infinity, 비정상적으로 큰 값 필터링
+    if (!Number.isFinite(value) || value < 0 || value > MAX_VALID_VIEW_COUNT) {
+      return 0;
+    }
+    return value;
+  };
+
   const avgReelsViews = reelsPosts.length > 0
-    ? Math.round(reelsPosts.reduce((sum, p) => sum + (p.videoViewCount || 0), 0) / reelsPosts.length)
+    ? Math.round(reelsPosts.reduce((sum, p) => sum + getValidViewCount(p.videoViewCount), 0) / reelsPosts.length)
     : 0;
   const reelsEngagement = detail?.followersCount && avgReelsViews > 0
     ? ((avgReelsViews / detail.followersCount) * 100).toFixed(1)
