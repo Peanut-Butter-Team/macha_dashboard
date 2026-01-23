@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as ChannelService from '@channel.io/channel-web-sdk-loader';
 
 export interface Brand {
   id: string;
@@ -80,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // 채널톡 세션 종료
+    ChannelService.shutdown();
     setUser(null);
     localStorage.removeItem('macha_user');
   };

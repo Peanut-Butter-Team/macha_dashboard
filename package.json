@@ -12,6 +12,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@channel.io/channel-web-sdk-loader": "^2.0.2",
     "@notionhq/client": "^2.2.15",
     "apify-client": "^2.21.0",
     "cors": "^2.8.5",

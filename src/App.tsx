@@ -31,6 +31,7 @@ import {
   useFollowerDemographic,
   useProfileContent,
 } from './hooks/useApi';
+import { useChannelTalk } from './hooks/useChannelTalk';
 import { syncDashMember, syncDashAd } from './services/metaDashApi';
 
 // 탭 타입
@@ -42,6 +43,9 @@ type TabType = 'profile' | 'ads' | 'campaign' | 'influencers';
 function App() {
   const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
+
+  // 채널톡 초기화 (사용자 상태 변화 감지)
+  useChannelTalk(user, isAuthenticated);
 
   // 로딩 중이면 로딩 표시
   if (authLoading) {
