@@ -8,6 +8,7 @@ import type {
   DashAdAccountInsight,
   DashAdSet,
   DashAdCampaignDetailItem,
+  ActionValue,
 } from '../types/metaDash';
 import type {
   ProfileInsight,
@@ -25,6 +26,15 @@ import { calculateCtr, calculateCpc, calculateFrequency, calculateGrowth } from 
 import { getLocalDateString, formatDateToMMDD } from './dates';
 import { getCountryName, mapMediaType, mapAdStatus } from './converters';
 import { getLatestInsightTime, findMetricValue, findInsightValue } from './extractors';
+
+/**
+ * ActionValue 배열에서 ROAS 값 추출
+ * purchaseRoas, webSitePurchaseRoas 등이 배열 형태로 오므로 첫 번째 값 반환
+ */
+function extractRoasValue(roasArray?: ActionValue[]): number {
+  if (!roasArray || roasArray.length === 0) return 0;
+  return roasArray[0]?.value || 0;
+}
 
 // 1. 프로필 인사이트 변환
 export function mapToProfileInsight(
@@ -337,7 +347,7 @@ export function mapToAdPerformance(
   const frequency = calculateFrequency(impressions, reach);
 
   // 오늘 ROAS 가중 평균 계산
-  const todayRoasWeighted = todayInsights.reduce((sum, i) => sum + (i.purchaseRoas || 0) * i.spend, 0);
+  const todayRoasWeighted = todayInsights.reduce((sum, i) => sum + extractRoasValue(i.purchaseRoas) * i.spend, 0);
   const roas = spend > 0 ? todayRoasWeighted / spend : 0;
 
   // 어제 합계
@@ -350,7 +360,7 @@ export function mapToAdPerformance(
   const yesterdayCpc = calculateCpc(yesterdaySpend, yesterdayClicks);
 
   // 어제 ROAS 가중 평균 계산
-  const yesterdayRoasWeighted = yesterdayInsights.reduce((sum, i) => sum + (i.purchaseRoas || 0) * i.spend, 0);
+  const yesterdayRoasWeighted = yesterdayInsights.reduce((sum, i) => sum + extractRoasValue(i.purchaseRoas) * i.spend, 0);
   const yesterdayRoas = yesterdaySpend > 0 ? yesterdayRoasWeighted / yesterdaySpend : 0;
 
   return {
@@ -402,7 +412,7 @@ export function mapToDailyAdData(
       impressions: existing.impressions + insight.impressions,
       clicks: existing.clicks + insight.clicks,
       reach: existing.reach + insight.reach,
-      roasWeighted: existing.roasWeighted + (insight.purchaseRoas || 0) * insight.spend,
+      roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
     });
   }
 
@@ -451,7 +461,7 @@ export function mapToCampaignPerformance(
     const totalImpressions = records.reduce((sum, r) => sum + r.insight.impressions, 0);
 
     // ROAS 가중 평균 계산
-    const roasWeighted = records.reduce((sum, r) => sum + (r.insight.purchaseRoas || 0) * r.insight.spend, 0);
+    const roasWeighted = records.reduce((sum, r) => sum + extractRoasValue(r.insight.purchaseRoas) * r.insight.spend, 0);
     const roas = totalSpend > 0 ? roasWeighted / totalSpend : 0;
 
     // 최초 기록일 추출 (가장 빠른 time 값)
@@ -514,7 +524,7 @@ export function mapToCampaignHierarchy(
       reach: existing.reach + insight.reach,
       clicks: existing.clicks + insight.clicks,
       impressions: existing.impressions + insight.impressions,
-      roasWeighted: existing.roasWeighted + (insight.purchaseRoas || 0) * insight.spend,
+      roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
     });
   }
 
@@ -703,13 +713,13 @@ export function mapToAdPerformanceFromCampaignDetail(
           todayReach += insight.reach || 0;
           todayClicks += insight.clicks || 0;
           todayImpressions += insight.impressions || 0;
-          todayRoasWeighted += (insight.purchaseRoas || 0) * (insight.spend || 0);
+          todayRoasWeighted += extractRoasValue(insight.purchaseRoas) * (insight.spend || 0);
         } else if (insightDate === yesterdayDate) {
           yesterdaySpend += insight.spend || 0;
           yesterdayReach += insight.reach || 0;
           yesterdayClicks += insight.clicks || 0;
           yesterdayImpressions += insight.impressions || 0;
-          yesterdayRoasWeighted += (insight.purchaseRoas || 0) * (insight.spend || 0);
+          yesterdayRoasWeighted += extractRoasValue(insight.purchaseRoas) * (insight.spend || 0);
         }
       }
     }
@@ -822,7 +832,7 @@ export function mapToDailyAdDataFromCampaignDetail(
           impressions: existing.impressions + insight.impressions,
           clicks: existing.clicks + insight.clicks,
           reach: existing.reach + insight.reach,
-          roasWeighted: existing.roasWeighted + (insight.purchaseRoas || 0) * insight.spend,
+          roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
         });
       }
     }
@@ -959,7 +969,7 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         const adReach = isToday ? (insight?.reach || 0) : 0;
         const adClicks = isToday ? (insight?.clicks || 0) : 0;
         const adImpressions = isToday ? (insight?.impressions || 0) : 0;
-        const adRoas = isToday ? (insight?.purchaseRoas || 0) : 0;
+        const adRoas = isToday ? extractRoasValue(insight?.purchaseRoas) : 0;
 
         return {
           id: adDetail?.id || '',
@@ -1006,7 +1016,7 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         const insightDate = c.dashAdAccountInsight?.time?.split('T')[0];
         if (insightDate !== todayStr) return sum;
         const spend = c.dashAdAccountInsight?.spend || 0;
-        const roas = c.dashAdAccountInsight?.purchaseRoas || 0;
+        const roas = extractRoasValue(c.dashAdAccountInsight?.purchaseRoas);
         return sum + roas * spend;
       }, 0);
       const adSetRoas = totalSpend > 0 ? totalRoasWeighted / totalSpend : 0;
@@ -1093,7 +1103,7 @@ export function mapToCampaignPerformanceFromCampaignDetail(
     const totalImpressions = records.reduce((sum, r) => sum + r.dashAdAccountInsight.impressions, 0);
 
     // ROAS 가중 평균 계산
-    const roasWeighted = records.reduce((sum, r) => sum + (r.dashAdAccountInsight.purchaseRoas || 0) * r.dashAdAccountInsight.spend, 0);
+    const roasWeighted = records.reduce((sum, r) => sum + extractRoasValue(r.dashAdAccountInsight.purchaseRoas) * r.dashAdAccountInsight.spend, 0);
     const roas = totalSpend > 0 ? roasWeighted / totalSpend : 0;
 
     const earliestTime = records.reduce((min, r) =>

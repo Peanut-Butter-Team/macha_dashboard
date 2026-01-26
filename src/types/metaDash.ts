@@ -123,6 +123,12 @@ export interface DashAdAccount {
   lastSyncedAt: string;
 }
 
+// Meta Ads API 액션 값 타입
+export interface ActionValue {
+  value: number;
+  action_type: string;
+}
+
 // 9. 광고 계정 인사이트 (개별 광고 성과)
 export interface DashAdAccountInsight {
   id: string;
@@ -136,10 +142,14 @@ export interface DashAdAccountInsight {
   spend: number;
   cpc: number | null;
   ctr: number;
-  purchaseRoas: number | null;    // 광고비 대비 수익률 (ROAS)
   lastSyncedAt: string;
   createdAt: string;
   updatedAt: string;
+  actions?: ActionValue[];
+  actionValues?: ActionValue[];
+  purchaseRoas?: ActionValue[];           // 광고비 대비 수익률 (ROAS)
+  webSitePurchaseRoas?: ActionValue[];    // 웹사이트 구매 ROAS
+  costPerActionType?: ActionValue[];
 }
 
 // 10. 광고 상세 정보
