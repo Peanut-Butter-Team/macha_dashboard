@@ -69,6 +69,51 @@ export const DAILY_PROFILE_DATA: DailyProfileData[] = [
 // ============================================
 // 메타 광고 API 데이터
 // ============================================
+
+// 빈 광고 성과 데이터 (데이터 없음 상태용)
+export const EMPTY_AD_PERFORMANCE: AdPerformance = {
+  spend: 0,
+  spendGrowth: 0,
+  roas: 0,
+  roasGrowth: 0,
+  cpc: 0,
+  cpcGrowth: 0,
+  ctr: 0,
+  ctrGrowth: 0,
+  impressions: 0,
+  reach: 0,
+  reachGrowth: 0,
+  clicks: 0,
+  clicksGrowth: 0,
+  conversions: 0,
+  frequency: 0,
+};
+
+// 빈 일별 광고 데이터 생성 함수 (최근 14일 날짜만 표시)
+export const generateEmptyDailyAdData = (): DailyAdData[] => {
+  const data: DailyAdData[] = [];
+  const today = new Date();
+
+  for (let i = 13; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+
+    data.push({
+      date: formattedDate,
+      spend: 0,
+      roas: 0,
+      clicks: 0,
+      impressions: 0,
+      conversions: 0,
+      ctr: 0,
+      cpc: 0,
+    });
+  }
+
+  return data;
+};
+
 export const AD_PERFORMANCE: AdPerformance = {
   spend: 32450000,
   spendGrowth: 12.3,

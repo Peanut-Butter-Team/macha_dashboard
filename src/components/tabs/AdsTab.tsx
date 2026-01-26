@@ -25,6 +25,7 @@ import {
 import { InfoTooltip } from '../common/InfoTooltip';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
 import { formatNumber, formatCurrency, formatPercent, formatRoas } from '../../utils/formatters';
+import { EMPTY_AD_PERFORMANCE, generateEmptyDailyAdData } from '../../data/dummyData';
 import type { AdPerformance, DailyAdData, CampaignPerformance, ProfileInsight, CampaignHierarchy } from '../../types';
 
 interface AdsTabProps {
@@ -59,6 +60,7 @@ function AdKPICard({
   isPositive,
   metricKey,
   loading,
+  isEmpty = false,
 }: {
   title: string;
   value: string;
@@ -67,6 +69,7 @@ function AdKPICard({
   isPositive: boolean;
   metricKey?: string;
   loading?: boolean;
+  isEmpty?: boolean;
 }) {
   if (loading) {
     return (
@@ -85,13 +88,19 @@ function AdKPICard({
         {metricKey && <InfoTooltip metricKey={metricKey} />}
       </div>
       <div>
-        <div className="text-2xl font-bold text-slate-900 leading-tight">{value}</div>
+        <div className={`text-2xl font-bold leading-tight ${isEmpty ? 'text-slate-300' : 'text-slate-900'}`}>
+          {isEmpty ? '-' : value}
+        </div>
         {subValue && <div className="text-xs text-slate-400">{subValue}</div>}
       </div>
-      <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
-        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-        <span>전일 대비 {change > 0 ? '+' : ''}{formatPercent(change)}</span>
-      </div>
+      {isEmpty ? (
+        <div className="text-xs text-slate-300">데이터 없음</div>
+      ) : (
+        <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+          {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+          <span>전일 대비 {change > 0 ? '+' : ''}{formatPercent(change)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -101,22 +110,33 @@ function SourcePieChart({
   title,
   data,
   metricKey,
+  isEmpty = false,
 }: {
   title: string;
   data: { name: string; value: number; color: string }[];
   metricKey?: string;
+  isEmpty?: boolean;
 }) {
+  const displayData = isEmpty
+    ? [{ name: '없음', value: 100, color: '#e2e8f0' }]
+    : data;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
       <div className="flex items-center gap-2 mb-4">
         <h4 className="text-lg font-semibold text-slate-900">{title}</h4>
         {metricKey && <InfoTooltip metricKey={metricKey} />}
       </div>
-      <div className="h-48">
+      <div className="h-48 relative">
+        {isEmpty && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <p className="text-slate-300 text-sm">데이터 없음</p>
+          </div>
+        )}
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={data}
+              data={displayData}
               cx="50%"
               cy="50%"
               innerRadius={50}
@@ -124,7 +144,7 @@ function SourcePieChart({
               paddingAngle={2}
               dataKey="value"
             >
-              {data.map((entry, index) => (
+              {displayData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
@@ -137,16 +157,16 @@ function SourcePieChart({
           <div key={index} className="flex items-center gap-2">
             <div
               className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: item.color }}
+              style={{ backgroundColor: isEmpty ? '#e2e8f0' : item.color }}
             />
-            <span className="text-sm text-slate-600">
+            <span className={`text-sm ${isEmpty ? 'text-slate-300' : 'text-slate-600'}`}>
               {item.name}
             </span>
             <span
               className="text-sm font-semibold"
-              style={{ color: item.color }}
+              style={{ color: isEmpty ? '#cbd5e1' : item.color }}
             >
-              {item.value}%
+              {isEmpty ? '-' : `${item.value}%`}
             </span>
           </div>
         ))}
@@ -273,13 +293,11 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
     { name: '광고 참여', value: adEngagementPercent, color: '#f59e0b' },
     { name: '유기적 참여', value: organicEngagementPercent, color: '#6366f1' },
   ];
-  if (!adData) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-500">
-        데이터를 불러오는 중...
-      </div>
-    );
-  }
+
+  // 빈 데이터 처리: 데이터가 없으면 빈 상태로 동일한 UI 유지
+  const effectiveAdData = adData || EMPTY_AD_PERFORMANCE;
+  const effectiveDailyData = (dailyData && dailyData.length > 0) ? dailyData : generateEmptyDailyAdData();
+  const hasData = !!adData && (adData.spend > 0 || adData.reach > 0 || adData.clicks > 0);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -289,51 +307,57 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
           <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <AdKPICard
           title="총 광고 지출"
-          value={formatCurrency(adData.spend)}
-          change={adData.spendGrowth}
+          value={formatCurrency(effectiveAdData.spend)}
+          change={effectiveAdData.spendGrowth}
           isPositive={true}
           metricKey="spend"
           loading={loading}
+          isEmpty={!hasData}
         />
         <AdKPICard
           title="ROAS"
-          value={formatRoas(adData.roas)}
-          change={adData.roasGrowth}
-          isPositive={adData.roasGrowth >= 0}
+          value={formatRoas(effectiveAdData.roas)}
+          change={effectiveAdData.roasGrowth}
+          isPositive={effectiveAdData.roasGrowth >= 0}
           metricKey="roas"
           loading={loading}
+          isEmpty={!hasData}
         />
         <AdKPICard
           title="총 광고 도달"
-          value={formatNumber(adData.reach)}
-          change={adData.reachGrowth}
-          isPositive={adData.reachGrowth >= 0}
+          value={formatNumber(effectiveAdData.reach)}
+          change={effectiveAdData.reachGrowth}
+          isPositive={effectiveAdData.reachGrowth >= 0}
           metricKey="reach"
           loading={loading}
+          isEmpty={!hasData}
         />
         <AdKPICard
           title="총 광고 클릭"
-          value={formatNumber(adData.clicks)}
-          change={adData.clicksGrowth}
-          isPositive={adData.clicksGrowth >= 0}
+          value={formatNumber(effectiveAdData.clicks)}
+          change={effectiveAdData.clicksGrowth}
+          isPositive={effectiveAdData.clicksGrowth >= 0}
           metricKey="clicks"
           loading={loading}
+          isEmpty={!hasData}
         />
         <AdKPICard
           title="평균 CTR"
-          value={formatPercent(adData.ctr)}
-          change={adData.ctrGrowth}
-          isPositive={adData.ctrGrowth >= 0}
+          value={formatPercent(effectiveAdData.ctr)}
+          change={effectiveAdData.ctrGrowth}
+          isPositive={effectiveAdData.ctrGrowth >= 0}
           metricKey="ctr"
           loading={loading}
+          isEmpty={!hasData}
         />
         <AdKPICard
           title="평균 CPC"
-          value={'₩' + Math.round(adData.cpc).toLocaleString()}
-          change={adData.cpcGrowth}
-          isPositive={adData.cpcGrowth <= 0}
+          value={'₩' + Math.round(effectiveAdData.cpc).toLocaleString()}
+          change={effectiveAdData.cpcGrowth}
+          isPositive={effectiveAdData.cpcGrowth <= 0}
           metricKey="cpc"
           loading={loading}
+          isEmpty={!hasData}
         />
       </section>
 
@@ -660,6 +684,12 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
               </div>
             )}
           </>
+        ) : campaignData.length === 0 ? (
+          /* 캠페인 데이터가 없을 때 빈 상태 메시지 */
+          <div className="bg-slate-50 rounded-xl p-8 text-center">
+            <p className="text-slate-400">등록된 캠페인이 없습니다</p>
+            <p className="text-slate-300 text-xs mt-1">Meta Ads Manager에서 캠페인을 생성하고 동기화하세요</p>
+          </div>
         ) : (
           /* 기존 테이블 UI (캠페인 계층 구조가 없을 때) */
           <>
@@ -787,9 +817,17 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
             </div>
           </div>
         </div>
-        <div className="h-80">
+        <div className="h-80 relative">
+          {!hasData && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80 rounded-lg">
+              <div className="text-center">
+                <p className="text-slate-400 text-sm">광고 데이터가 없습니다</p>
+                <p className="text-slate-300 text-xs mt-1">광고 캠페인을 시작하면 데이터가 표시됩니다</p>
+              </div>
+            </div>
+          )}
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={dailyData || []}>
+            <ComposedChart data={effectiveDailyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
               <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => '₩' + (v / 1000).toFixed(0) + 'K'} />
@@ -830,9 +868,14 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
             <h3 className="text-lg font-semibold text-slate-900">CTR 추이</h3>
             <InfoTooltip metricKey="ctr" />
           </div>
-          <div className="h-64">
+          <div className="h-64 relative">
+            {!hasData && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80 rounded-lg">
+                <p className="text-slate-400 text-sm">데이터 없음</p>
+              </div>
+            )}
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyData || []}>
+              <LineChart data={effectiveDailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
                 <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => v + '%'} />
@@ -863,9 +906,14 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
             <h3 className="text-lg font-semibold text-slate-900">일별 클릭</h3>
             <InfoTooltip metricKey="clicks" />
           </div>
-          <div className="h-64">
+          <div className="h-64 relative">
+            {!hasData && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80 rounded-lg">
+                <p className="text-slate-400 text-sm">데이터 없음</p>
+              </div>
+            )}
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyData || []}>
+              <BarChart data={effectiveDailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
                 <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={formatNumber} />
@@ -889,8 +937,8 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, pro
       <section>
         <h3 className="text-lg font-semibold text-slate-900 mb-4">유기적 vs 광고 성과 비교</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SourcePieChart title="도달 출처" data={reachSourceData} metricKey="reachSource" />
-          <SourcePieChart title="참여 출처" data={engagementSourceData} metricKey="engagementSource" />
+          <SourcePieChart title="도달 출처" data={reachSourceData} metricKey="reachSource" isEmpty={!hasData} />
+          <SourcePieChart title="참여 출처" data={engagementSourceData} metricKey="engagementSource" isEmpty={!hasData} />
         </div>
       </section>
 
