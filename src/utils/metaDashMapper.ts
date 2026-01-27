@@ -859,13 +859,10 @@ export function mapToDailyAdDataFromCampaignDetail(
 }
 
 // 11. 캠페인 상세 응답에서 캠페인 계층 구조 변환
+// 전체 기간 데이터를 합산하여 표시 (오늘 데이터 없어도 정상 표시)
 export function mapToCampaignHierarchyFromCampaignDetail(
   campaignDetails: DashAdCampaignDetailItem[]
 ): CampaignHierarchy[] {
-  // 실제 오늘 날짜 계산 (로컬 시간 기준, KPI 카드와 동일)
-  const today = new Date();
-  const todayStr = getLocalDateString(today);
-
   // campaignId 기준 중복 제거 (Map 사용)
   const campaignMap = new Map<string, DashAdCampaignDetailItem>();
 
@@ -935,41 +932,40 @@ export function mapToCampaignHierarchyFromCampaignDetail(
       const adSet = adDetailObj.dashAdSet;
       const childObjs = adDetailObj.adSetChildObjs || [];
 
-      // 소재 중복 제거 (adId 기준, 오늘 데이터 우선)
-      const adMap = new Map<string, typeof childObjs[0]>();
+      // 소재별로 모든 날짜의 인사이트를 그룹핑 (전체 기간 합산)
+      const adInsightsMap = new Map<string, { detail: typeof childObjs[0]['dashAdDetailEntity']; insights: typeof childObjs[0]['dashAdAccountInsight'][] }>();
       for (const child of childObjs) {
         const adId = child.dashAdDetailEntity?.adId;
         if (!adId) continue;
 
-        const existingChild = adMap.get(adId);
-        if (!existingChild) {
-          adMap.set(adId, child);
+        const existing = adInsightsMap.get(adId);
+        if (!existing) {
+          adInsightsMap.set(adId, {
+            detail: child.dashAdDetailEntity,
+            insights: child.dashAdAccountInsight ? [child.dashAdAccountInsight] : [],
+          });
         } else {
-          // 기존 데이터가 오늘이 아니고, 새 데이터가 오늘이면 교체
-          const existingDate = existingChild.dashAdAccountInsight?.time?.split('T')[0];
-          const newDate = child.dashAdAccountInsight?.time?.split('T')[0];
-          if (existingDate !== todayStr && newDate === todayStr) {
-            adMap.set(adId, child);
+          // 같은 adId의 다른 날짜 인사이트 추가 (중복 날짜 제거)
+          if (child.dashAdAccountInsight) {
+            const newDate = child.dashAdAccountInsight.time?.split('T')[0];
+            const alreadyHasDate = existing.insights.some(i => i.time?.split('T')[0] === newDate);
+            if (!alreadyHasDate) {
+              existing.insights.push(child.dashAdAccountInsight);
+            }
           }
         }
       }
-      const uniqueChildObjs = Array.from(adMap.values());
 
-      // 소재(Ad) 목록 매핑 (중복 제거된 데이터 사용)
-      const ads: AdWithPerformance[] = uniqueChildObjs.map(child => {
-        const adDetail = child.dashAdDetailEntity;
-        const insight = child.dashAdAccountInsight;
-
-        // 오늘 데이터인지 확인 (KPI 카드와 동일한 기준)
-        const insightDate = insight?.time?.split('T')[0];
-        const isToday = insightDate === todayStr;
-
-        // 오늘 데이터만 사용 (오늘이 아니면 0)
-        const adSpend = isToday ? (insight?.spend || 0) : 0;
-        const adReach = isToday ? (insight?.reach || 0) : 0;
-        const adClicks = isToday ? (insight?.clicks || 0) : 0;
-        const adImpressions = isToday ? (insight?.impressions || 0) : 0;
-        const adRoas = isToday ? extractRoasValue(insight?.purchaseRoas) : 0;
+      // 소재(Ad) 목록 매핑 (전체 기간 데이터 합산)
+      const ads: AdWithPerformance[] = Array.from(adInsightsMap.values()).map(({ detail: adDetail, insights }) => {
+        // 전체 기간 인사이트 합산
+        const adSpend = insights.reduce((sum, i) => sum + (i?.spend || 0), 0);
+        const adReach = insights.reduce((sum, i) => sum + (i?.reach || 0), 0);
+        const adClicks = insights.reduce((sum, i) => sum + (i?.clicks || 0), 0);
+        const adImpressions = insights.reduce((sum, i) => sum + (i?.impressions || 0), 0);
+        // ROAS 가중 평균 계산
+        const adRoasWeighted = insights.reduce((sum, i) => sum + extractRoasValue(i?.purchaseRoas) * (i?.spend || 0), 0);
+        const adRoas = adSpend > 0 ? adRoasWeighted / adSpend : 0;
 
         return {
           id: adDetail?.id || '',
@@ -993,32 +989,14 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         };
       });
 
-      // 해당 광고세트의 오늘 광고 성과 합산 (중복 제거된 데이터 사용)
-      const totalSpend = uniqueChildObjs.reduce((sum, c) => {
-        const insightDate = c.dashAdAccountInsight?.time?.split('T')[0];
-        return sum + (insightDate === todayStr ? (c.dashAdAccountInsight?.spend || 0) : 0);
-      }, 0);
-      const totalReach = uniqueChildObjs.reduce((sum, c) => {
-        const insightDate = c.dashAdAccountInsight?.time?.split('T')[0];
-        return sum + (insightDate === todayStr ? (c.dashAdAccountInsight?.reach || 0) : 0);
-      }, 0);
-      const totalClicks = uniqueChildObjs.reduce((sum, c) => {
-        const insightDate = c.dashAdAccountInsight?.time?.split('T')[0];
-        return sum + (insightDate === todayStr ? (c.dashAdAccountInsight?.clicks || 0) : 0);
-      }, 0);
-      const totalImpressions = uniqueChildObjs.reduce((sum, c) => {
-        const insightDate = c.dashAdAccountInsight?.time?.split('T')[0];
-        return sum + (insightDate === todayStr ? (c.dashAdAccountInsight?.impressions || 0) : 0);
-      }, 0);
+      // 해당 광고세트의 전체 기간 성과 합산 (소재 성과 합산)
+      const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
+      const totalReach = ads.reduce((sum, ad) => sum + ad.reach, 0);
+      const totalClicks = ads.reduce((sum, ad) => sum + ad.clicks, 0);
+      const totalImpressions = ads.reduce((sum, ad) => sum + ad.impressions, 0);
 
       // 광고세트 ROAS 가중 평균 계산
-      const totalRoasWeighted = uniqueChildObjs.reduce((sum, c) => {
-        const insightDate = c.dashAdAccountInsight?.time?.split('T')[0];
-        if (insightDate !== todayStr) return sum;
-        const spend = c.dashAdAccountInsight?.spend || 0;
-        const roas = extractRoasValue(c.dashAdAccountInsight?.purchaseRoas);
-        return sum + roas * spend;
-      }, 0);
+      const totalRoasWeighted = ads.reduce((sum, ad) => sum + ad.roas * ad.spend, 0);
       const adSetRoas = totalSpend > 0 ? totalRoasWeighted / totalSpend : 0;
 
       return {
