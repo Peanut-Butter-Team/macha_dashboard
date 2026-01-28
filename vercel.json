@@ -72,6 +72,10 @@
       "destination": "/api/image-proxy.js"
     },
     {
+      "source": "/api/applicants",
+      "destination": "/api/applicants.js"
+    },
+    {
       "source": "/((?!api|blog|robots\\.txt).*)",
       "destination": "/index.html"
     }
