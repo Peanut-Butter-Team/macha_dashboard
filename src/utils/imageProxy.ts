@@ -8,6 +8,9 @@
 // CloudFront 베이스 URL
 const CLOUDFRONT_BASE_URL = 'https://d2xwq3y8g7dpg3.cloudfront.net';
 
+// API 베이스 URL (프로덕션에서는 상대 경로, 로컬에서는 localhost:3001)
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3001';
+
 // Instagram API URL (로컬 서버 전용 - 프로덕션 서버에는 없음)
 const INSTAGRAM_API_URL = import.meta.env.VITE_INSTAGRAM_API_URL || 'http://localhost:3001';
 
@@ -25,9 +28,9 @@ export function getProxiedImageUrl(url: string | null | undefined): string {
     return `${CLOUDFRONT_BASE_URL}${url}`;
   }
 
-  // Instagram/Facebook CDN → 현재 접근 불가로 빈 문자열 반환 (fallback 표시)
+  // Instagram/Facebook CDN → 서버 프록시를 통해 요청
   if (url.includes('instagram') || url.includes('fbcdn') || url.includes('cdninstagram')) {
-    return '';
+    return `${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
 
   return url;
