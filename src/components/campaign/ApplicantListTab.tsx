@@ -1,9 +1,10 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Search, ChevronUp, ChevronDown, Heart, ExternalLink, Users, UserPlus, X } from 'lucide-react';
-import type { DashInfluencerWithDetail } from '../../types/metaDash';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Search, ChevronUp, ChevronDown, Heart, ExternalLink, Users, UserPlus, X, Instagram, MessageCircle, Calendar, Play, Eye, RefreshCw, Loader2 } from 'lucide-react';
+import type { DashInfluencerWithDetail, DashInfluencerPost, DashInfluencer, DashInfluencerDetail } from '../../types/metaDash';
 import type { SeedingItem, Influencer } from '../../types';
-import { getProxiedImageUrl } from '../../utils/imageProxy';
+import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramProfileImageUrl, getInstagramPostImageUrl } from '../../utils/imageProxy';
 import { formatNumber as formatNumberBase, formatPercent } from '../../utils/formatters';
+import { updateDashInfluencer, fetchDashInfluencerDetail } from '../../services/metaDashApi';
 
 // 숫자 포맷팅 (null/undefined 처리 포함)
 const formatNumber = (num: number | null | undefined): string => {
@@ -11,12 +12,527 @@ const formatNumber = (num: number | null | undefined): string => {
   return formatNumberBase(num);
 };
 
+// Instagram 프로필 이미지 컴포넌트 (CDN 만료 대응)
+function InstagramProfileImage({
+  originalUrl,
+  username,
+  name,
+  size = 'md',
+}: {
+  originalUrl: string | null | undefined;
+  username: string | null | undefined;
+  name: string | null | undefined;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const [imageSrc, setImageSrc] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasFailed, setHasFailed] = useState(false);
+
+  const sizeClasses = {
+    sm: 'w-12 h-12 text-lg',
+    md: 'w-20 h-20 text-2xl',
+    lg: 'w-24 h-24 text-3xl',
+  };
+
+  useEffect(() => {
+    const loadImage = async () => {
+      setIsLoading(true);
+      setHasFailed(false);
+
+      // 1. 원본 URL이 유효한 경우 시도
+      const proxiedUrl = getProxiedImageUrl(originalUrl);
+      if (proxiedUrl) {
+        setImageSrc(proxiedUrl);
+        return;
+      }
+
+      // 2. CDN 만료된 경우 → API로 새 URL 가져오기
+      if (username && isInstagramCdnUrl(originalUrl)) {
+        try {
+          const apiUrl = getInstagramProfileImageUrl(username);
+          const response = await fetch(apiUrl);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.imageUrl) {
+              setImageSrc(data.imageUrl);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('프로필 이미지 로딩 실패:', username, error);
+        }
+      }
+
+      // 3. 실패 시 fallback
+      setHasFailed(true);
+      setIsLoading(false);
+    };
+
+    loadImage();
+  }, [originalUrl, username]);
+
+  const handleImageError = async () => {
+    // 이미지 로드 실패 시 API fallback 시도
+    if (!hasFailed && username) {
+      try {
+        const apiUrl = getInstagramProfileImageUrl(username);
+        const response = await fetch(apiUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.imageUrl) {
+            setImageSrc(data.imageUrl);
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('프로필 이미지 fallback 실패:', username, error);
+      }
+    }
+    setHasFailed(true);
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  const initial = (name ?? '?').charAt(0).toUpperCase();
+
+  if (hasFailed || !imageSrc) {
+    return (
+      <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-white font-bold`}>
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${sizeClasses[size]}`}>
+      {isLoading && (
+        <div className="w-full h-full rounded-full bg-slate-200 animate-pulse absolute inset-0" />
+      )}
+      <img
+        src={imageSrc}
+        alt={name ?? ''}
+        referrerPolicy="no-referrer"
+        className={`w-full h-full rounded-full object-cover bg-slate-100 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+      />
+    </div>
+  );
+}
+
+// Instagram 게시물 이미지 컴포넌트 (CDN 만료 대응)
+function InstagramPostImage({
+  originalUrl,
+  shortCode,
+  alt,
+  className = '',
+}: {
+  originalUrl: string | null | undefined;
+  shortCode: string | null | undefined;
+  alt: string;
+  className?: string;
+}) {
+  const [imageSrc, setImageSrc] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasFailed, setHasFailed] = useState(false);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      setIsLoading(true);
+      setHasFailed(false);
+
+      // 1. 원본 URL이 유효한 경우 시도
+      const proxiedUrl = getProxiedImageUrl(originalUrl);
+      if (proxiedUrl) {
+        setImageSrc(proxiedUrl);
+        return;
+      }
+
+      // 2. CDN 만료된 경우 → API로 새 URL 가져오기
+      if (shortCode && isInstagramCdnUrl(originalUrl)) {
+        try {
+          const apiUrl = getInstagramPostImageUrl(shortCode);
+          const response = await fetch(apiUrl);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.imageUrl) {
+              setImageSrc(data.imageUrl);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('게시물 이미지 로딩 실패:', shortCode, error);
+        }
+      }
+
+      // 3. 실패 시 fallback
+      setHasFailed(true);
+      setIsLoading(false);
+    };
+
+    loadImage();
+  }, [originalUrl, shortCode]);
+
+  const handleImageError = async () => {
+    // 이미지 로드 실패 시 API fallback 시도
+    if (!hasFailed && shortCode) {
+      try {
+        const apiUrl = getInstagramPostImageUrl(shortCode);
+        const response = await fetch(apiUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.imageUrl) {
+            setImageSrc(data.imageUrl);
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('게시물 이미지 fallback 실패:', shortCode, error);
+      }
+    }
+    setHasFailed(true);
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  if (hasFailed || !imageSrc) {
+    return (
+      <div className={`${className} bg-slate-200 flex items-center justify-center`}>
+        <span className="text-slate-400 text-xs">이미지 없음</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      {isLoading && (
+        <div className="w-full h-full bg-slate-200 animate-pulse absolute inset-0 rounded-lg" />
+      )}
+      <img
+        src={imageSrc}
+        alt={alt}
+        referrerPolicy="no-referrer"
+        className={`w-full h-full object-cover rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+      />
+    </div>
+  );
+}
+
+// 콘텐츠 유형 분포 차트 컴포넌트
+function ContentTypeChart({ posts }: { posts: DashInfluencerPost[] }) {
+  const total = posts.length;
+  if (total === 0) return null;
+
+  const carousel = posts.filter(p => p.type === 'Sidecar' || (p.childPosts && p.childPosts.length > 0)).length;
+  const reels = posts.filter(p => p.type === 'Video' || p.productType === 'reels').length;
+  const image = total - carousel - reels;
+
+  const carouselPct = Math.round((carousel / total) * 100);
+  const reelsPct = Math.round((reels / total) * 100);
+  const imagePct = 100 - carouselPct - reelsPct;
+
+  const gradient = `conic-gradient(
+    #f97316 0% ${carouselPct}%,
+    #8b5cf6 ${carouselPct}% ${carouselPct + reelsPct}%,
+    #06b6d4 ${carouselPct + reelsPct}% 100%
+  )`;
+
+  return (
+    <div className="flex items-center gap-6">
+      <div className="relative w-24 h-24">
+        <div className="w-full h-full rounded-full" style={{ background: gradient }} />
+        <div className="absolute inset-3 bg-white rounded-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-xs text-slate-500">전체</div>
+            <div className="font-bold text-slate-900">{total}</div>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-orange-500" />
+          <span className="text-slate-600">캐러셀</span>
+          <span className="text-slate-900 font-medium">{carousel} ({carouselPct}%)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-violet-500" />
+          <span className="text-slate-600">릴스</span>
+          <span className="text-slate-900 font-medium">{reels} ({reelsPct}%)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-cyan-500" />
+          <span className="text-slate-600">이미지</span>
+          <span className="text-slate-900 font-medium">{image} ({imagePct}%)</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 인플루언서 상세 모달 컴포넌트
+function InfluencerDetailModal({
+  item,
+  isOpen,
+  onClose,
+  onRefresh
+}: {
+  item: DashInfluencerWithDetail | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onRefresh?: (updatedInfluencer: DashInfluencer, updatedDetail: DashInfluencerDetail | null) => void;
+}) {
+  const [feedSortBy, setFeedSortBy] = useState<'popular' | 'comments' | 'latest'>('popular');
+  const [reelsSortBy, setReelsSortBy] = useState<'popular' | 'views' | 'latest'>('popular');
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
+
+  const handleRefresh = async () => {
+    if (refreshing || !item) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    setRefreshSuccess(false);
+
+    try {
+      const updated = await updateDashInfluencer(item.dashInfluencer.id, item.dashInfluencer);
+      if (!updated) throw new Error('갱신된 데이터를 받지 못했습니다');
+
+      const detailResponse = await fetchDashInfluencerDetail(item.dashInfluencer.id);
+      const updatedDetail = detailResponse?.dashInfluencerDetail || null;
+
+      if (onRefresh) onRefresh(updated, updatedDetail);
+      setRefreshSuccess(true);
+      setTimeout(() => setRefreshSuccess(false), 3000);
+    } catch (error) {
+      console.error('인플루언서 데이터 갱신 실패:', error);
+      setRefreshError(error instanceof Error ? error.message : '갱신 실패');
+      setTimeout(() => setRefreshError(null), 5000);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  if (!isOpen || !item) return null;
+
+  const influencer = item.dashInfluencer;
+  const detail = item.dashInfluencerDetail;
+  const allPosts = detail?.latestPosts || [];
+
+  const feedPosts = allPosts.filter(p => p.productType !== 'reels' && p.type !== 'Video');
+  const reelsPosts = allPosts.filter(p => p.productType === 'reels' || p.type === 'Video');
+
+  const sortedFeedPosts = [...feedPosts].sort((a, b) => {
+    if (feedSortBy === 'popular') return (b.likesCount || 0) - (a.likesCount || 0);
+    if (feedSortBy === 'comments') return (b.commentsCount || 0) - (a.commentsCount || 0);
+    return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+  });
+
+  const sortedReelsPosts = [...reelsPosts].sort((a, b) => {
+    if (reelsSortBy === 'popular') return (b.likesCount || 0) - (a.likesCount || 0);
+    if (reelsSortBy === 'views') return (b.videoViewCount || 0) - (a.videoViewCount || 0);
+    return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+  });
+
+  const avgLikes = allPosts.length > 0
+    ? Math.round(allPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / allPosts.length)
+    : 0;
+  const avgComments = allPosts.length > 0
+    ? Math.round(allPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / allPosts.length)
+    : 0;
+
+  const MAX_VALID_VIEW_COUNT = 1_000_000_000;
+  const getValidViewCount = (count: number | string | undefined | null) => {
+    const value = Number(count) || 0;
+    if (!Number.isFinite(value) || value < 0 || value > MAX_VALID_VIEW_COUNT) return 0;
+    return value;
+  };
+
+  const avgReelsViews = reelsPosts.length > 0
+    ? Math.round(reelsPosts.reduce((sum, p) => sum + getValidViewCount(p.videoViewCount), 0) / reelsPosts.length)
+    : 0;
+  const reelsEngagement = detail?.followersCount && avgReelsViews > 0
+    ? (avgReelsViews / detail.followersCount) * 100
+    : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <button onClick={onClose} className="absolute top-3 right-3 z-10 p-1.5 hover:bg-slate-100 rounded-full transition-colors">
+          <X size={18} className="text-slate-500" />
+        </button>
+
+        <div className="overflow-y-auto max-h-[90vh]">
+          {/* 프로필 헤더 */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <InstagramProfileImage
+                  originalUrl={detail?.profilePicUrl}
+                  username={influencer?.username}
+                  name={influencer?.name}
+                  size="md"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">{influencer?.category?.join(' · ')}</div>
+                <h2 className="text-xl font-bold text-slate-900">{detail?.fullName || influencer?.name || '-'}</h2>
+                <div className="flex items-center gap-4 mt-1 text-sm text-slate-600">
+                  <div className="flex items-center gap-1"><Instagram size={14} /><span>팔로워 {formatNumber(detail?.followersCount)}</span></div>
+                  <div>게시글수 {formatNumber(detail?.postsCount)}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mr-8">
+                <button onClick={handleRefresh} disabled={refreshing} className={`p-2 border rounded-lg transition-colors ${refreshing ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-slate-200 hover:bg-slate-50'}`} title="데이터 새로고침">
+                  {refreshing ? <Loader2 size={20} className="text-slate-400 animate-spin" /> : <RefreshCw size={20} className="text-slate-400" />}
+                </button>
+                <button className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"><Heart size={20} className="text-slate-400" /></button>
+                <a href={`https://instagram.com/${influencer.username?.trim()}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors">
+                  <ExternalLink size={16} /><span>프로필 바로가기</span>
+                </a>
+              </div>
+            </div>
+            {refreshSuccess && <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-600">데이터가 성공적으로 갱신되었습니다.</div>}
+            {refreshError && <div className="mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">갱신 실패: {refreshError}</div>}
+            {detail?.biography && <div className="mt-4 p-3 bg-slate-50 rounded-lg text-sm text-slate-600 whitespace-pre-line">{detail.biography}</div>}
+          </div>
+
+          {/* 성과 지표 */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="font-semibold text-slate-900 mb-3">인플루언서와 얼마나 잘 맞는지 확인해 보세요</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="text-sm text-slate-500 mb-3">• 성과 지표</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><div className="text-xs text-slate-500">평균 댓글</div><div className="font-bold text-slate-900">{formatNumber(avgComments)}개</div></div>
+                  <div><div className="text-xs text-slate-500">평균 좋아요</div><div className="font-bold text-slate-900">{formatNumber(avgLikes)}</div></div>
+                  <div><div className="text-xs text-slate-500">릴스 평균 조회수</div><div className="font-bold text-slate-900">{formatNumber(avgReelsViews)}회</div></div>
+                  <div><div className="text-xs text-slate-500">릴스 평균 참여율</div><div className="font-bold text-slate-900">{formatPercent(reelsEngagement)}</div></div>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="text-sm text-slate-500 mb-3">• 콘텐츠 매칭 점수</div>
+                <div className="flex items-center justify-center h-24 text-slate-400 text-sm">AI 추천에서만 제공해요</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 콘텐츠 분석 */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="font-semibold text-slate-900 mb-3">최근 콘텐츠를 분석해 봤어요</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm text-slate-500 mb-3">• 콘텐츠 유형 분포</div>
+                <ContentTypeChart posts={allPosts} />
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 mb-3">• 브랜드 협업 비율</div>
+                <div className="flex items-center justify-center h-24">
+                  <div className="text-center text-slate-400 text-sm">
+                    <div className="w-16 h-16 mx-auto mb-2 rounded-full bg-slate-100 flex items-center justify-center text-2xl">?</div>
+                    데이터가 충분하지 않아요
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 피드 콘텐츠 */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900">피드 콘텐츠</h3>
+              <div className="flex items-center gap-4 text-sm text-slate-600">
+                <span>평균 좋아요 <strong>{formatNumber(feedPosts.length > 0 ? Math.round(feedPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / feedPosts.length) : 0)}</strong> 개</span>
+                <span>평균 댓글 <strong>{formatNumber(feedPosts.length > 0 ? Math.round(feedPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / feedPosts.length) : 0)}</strong> 개</span>
+              </div>
+            </div>
+            <div className="flex border-b border-slate-200 mb-3">
+              {[{ key: 'popular', label: '인기순' }, { key: 'comments', label: '댓글순' }, { key: 'latest', label: '최신순' }].map((tab) => (
+                <button key={tab.key} onClick={() => setFeedSortBy(tab.key as typeof feedSortBy)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${feedSortBy === tab.key ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{tab.label}</button>
+              ))}
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {sortedFeedPosts.slice(0, 15).map((post, idx) => (
+                <a key={post.id || idx} href={post.url || `https://instagram.com/p/${post.shortCode}`} target="_blank" rel="noopener noreferrer" className="group relative aspect-square">
+                  <InstagramPostImage
+                    originalUrl={post.displayUrl || post.images?.[0]}
+                    shortCode={post.shortCode}
+                    alt={`Post ${idx + 1}`}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                    <div className="text-white text-xs text-center space-y-1">
+                      <div className="flex items-center justify-center gap-1"><Heart size={12} fill="white" /><span>{formatNumber(post.likesCount || 0)}</span></div>
+                      <div className="flex items-center justify-center gap-1"><MessageCircle size={12} fill="white" /><span>{formatNumber(post.commentsCount || 0)}</span></div>
+                      {post.timestamp && <div className="flex items-center justify-center gap-1"><Calendar size={12} /><span>{new Date(post.timestamp).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span></div>}
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+            {sortedFeedPosts.length === 0 && <div className="text-center py-8 text-slate-400">등록된 피드 콘텐츠가 없어요</div>}
+          </div>
+
+          {/* 릴스 콘텐츠 */}
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900">릴스 콘텐츠</h3>
+              <div className="flex items-center gap-4 text-sm text-slate-600">
+                <span>평균 조회수 <strong>{formatNumber(avgReelsViews)}</strong> 회</span>
+                <span>평균 좋아요 <strong>{formatNumber(reelsPosts.length > 0 ? Math.round(reelsPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / reelsPosts.length) : 0)}</strong> 개</span>
+              </div>
+            </div>
+            <div className="flex border-b border-slate-200 mb-3">
+              {[{ key: 'views', label: '조회수순' }, { key: 'popular', label: '좋아요순' }, { key: 'latest', label: '최신순' }].map((tab) => (
+                <button key={tab.key} onClick={() => setReelsSortBy(tab.key as typeof reelsSortBy)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${reelsSortBy === tab.key ? 'border-violet-500 text-violet-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{tab.label}</button>
+              ))}
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {sortedReelsPosts.slice(0, 15).map((post, idx) => (
+                <a key={post.id || idx} href={post.url || `https://instagram.com/p/${post.shortCode}`} target="_blank" rel="noopener noreferrer" className="group relative aspect-square">
+                  <InstagramPostImage
+                    originalUrl={post.displayUrl || post.images?.[0]}
+                    shortCode={post.shortCode}
+                    alt={`Reels ${idx + 1}`}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                  <div className="absolute top-2 right-2 bg-black/50 rounded-full p-1"><Play size={12} fill="white" className="text-white" /></div>
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                    <div className="text-white text-xs text-center space-y-1">
+                      <div className="flex items-center justify-center gap-1"><Eye size={12} /><span>{formatNumber(post.videoViewCount || 0)}</span></div>
+                      <div className="flex items-center justify-center gap-1"><Heart size={12} fill="white" /><span>{formatNumber(post.likesCount || 0)}</span></div>
+                      <div className="flex items-center justify-center gap-1"><MessageCircle size={12} fill="white" /><span>{formatNumber(post.commentsCount || 0)}</span></div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+            {sortedReelsPosts.length === 0 && <div className="text-center py-8 text-slate-400">등록된 릴스 콘텐츠가 없어요</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ApplicantListTabProps {
   // 매칭된 인플루언서 목록 (DashInfluencerWithDetail)
   matchedInfluencers: DashInfluencerWithDetail[];
   // 선택된 인플루언서를 참여자로 추가
   onAddToSeeding: (seedingItems: SeedingItem[]) => void;
   campaignId: string;
+  // 참여 인플루언서 모드 (되돌리기 버튼 표시)
+  isSeeding?: boolean;
+  // 되돌리기 콜백 (isSeeding 모드에서 사용)
+  onRemoveFromSeeding?: (influencerIds: string[]) => void;
 }
 
 const PAGE_SIZE = 15;
@@ -46,7 +562,7 @@ function TableHeader({
       : <ChevronDown size={14} className="text-orange-500" />;
   };
 
-  const headerClass = "px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-50 select-none";
+  const headerBaseClass = "px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-50 select-none whitespace-nowrap";
 
   return (
     <thead className="bg-slate-50 border-b border-slate-200">
@@ -60,40 +576,40 @@ function TableHeader({
             className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
           />
         </th>
-        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-64">
+        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-52">
           프로필
         </th>
-        <th className={headerClass} onClick={() => onSort('followerCount')}>
-          <div className="flex items-center gap-1">
+        <th className={`${headerBaseClass} w-24`} onClick={() => onSort('followerCount')}>
+          <div className="flex items-center justify-end gap-1 w-full">
             팔로워수 <SortIcon field="followerCount" />
           </div>
         </th>
-        <th className={headerClass} onClick={() => onSort('postsCount')}>
-          <div className="flex items-center gap-1">
+        <th className={`${headerBaseClass} w-20`} onClick={() => onSort('postsCount')}>
+          <div className="flex items-center justify-end gap-1 w-full">
             게시물수 <SortIcon field="postsCount" />
           </div>
         </th>
-        <th className={headerClass} onClick={() => onSort('avgLikes')}>
-          <div className="flex items-center gap-1">
-            평균 좋아요 <SortIcon field="avgLikes" />
+        <th className={`${headerBaseClass} w-24`} onClick={() => onSort('avgLikes')}>
+          <div className="flex items-center justify-end gap-1 w-full">
+            평균좋아요 <SortIcon field="avgLikes" />
           </div>
         </th>
-        <th className={headerClass} onClick={() => onSort('avgComments')}>
-          <div className="flex items-center gap-1">
-            평균 댓글 <SortIcon field="avgComments" />
+        <th className={`${headerBaseClass} w-20`} onClick={() => onSort('avgComments')}>
+          <div className="flex items-center justify-end gap-1 w-full">
+            평균댓글 <SortIcon field="avgComments" />
           </div>
         </th>
-        <th className={headerClass} onClick={() => onSort('engagementRate')}>
-          <div className="flex items-center gap-1">
+        <th className={`${headerBaseClass} w-20`} onClick={() => onSort('engagementRate')}>
+          <div className="flex items-center justify-end gap-1 w-full">
             참여율 <SortIcon field="engagementRate" />
           </div>
         </th>
-        <th className={headerClass} onClick={() => onSort('latestPost')}>
-          <div className="flex items-center gap-1">
-            최근 활동 <SortIcon field="latestPost" />
+        <th className={`${headerBaseClass} w-24`} onClick={() => onSort('latestPost')}>
+          <div className="flex items-center justify-center gap-1 w-full">
+            최근활동 <SortIcon field="latestPost" />
           </div>
         </th>
-        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-56">
           콘텐츠
         </th>
       </tr>
@@ -169,30 +685,13 @@ function TableRow({
       <td className="px-4 py-4">
         <div className="flex items-center gap-3">
           {/* 프로필 이미지 */}
-          <div className="flex-shrink-0 relative">
-            {(detail?.profilePicUrl || influencer.profileImageUrl) ? (
-              <>
-                <img
-                  src={getProxiedImageUrl(detail?.profilePicUrl || influencer?.profileImageUrl)}
-                  alt={influencer?.name ?? ''}
-                  referrerPolicy="no-referrer"
-                  className="w-12 h-12 rounded-full object-cover bg-slate-100"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const fallback = target.nextElementSibling as HTMLElement;
-                    if (fallback) fallback.style.display = 'flex';
-                  }}
-                />
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 items-center justify-center text-white text-lg font-bold hidden">
-                  {(influencer?.name ?? '?').charAt(0).toUpperCase()}
-                </div>
-              </>
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
-                {(influencer?.name ?? '?').charAt(0).toUpperCase()}
-              </div>
-            )}
+          <div className="flex-shrink-0">
+            <InstagramProfileImage
+              originalUrl={detail?.profilePicUrl || influencer?.profileImageUrl}
+              username={influencer?.username}
+              name={influencer?.name}
+              size="sm"
+            />
           </div>
 
           {/* 이름 + 카테고리 */}
@@ -226,49 +725,63 @@ function TableRow({
       </td>
 
       {/* 팔로워수 */}
-      <td className="px-4 py-4 text-sm text-slate-700 font-medium">
-        {formatNumber(detail?.followersCount || influencer.followerCount)}
+      <td className="px-4 py-4 text-sm text-slate-700 font-medium w-24">
+        <div className="flex items-center justify-end gap-1 w-full">
+          <span className="tabular-nums">{formatNumber(detail?.followersCount || influencer.followerCount)}</span>
+          <span className="w-[14px]" />
+        </div>
       </td>
 
       {/* 게시물수 */}
-      <td className="px-4 py-4 text-sm text-slate-700">
-        {formatNumber(detail?.postsCount)}
+      <td className="px-4 py-4 text-sm text-slate-700 w-20">
+        <div className="flex items-center justify-end gap-1 w-full">
+          <span className="tabular-nums">{formatNumber(detail?.postsCount)}</span>
+          <span className="w-[14px]" />
+        </div>
       </td>
 
       {/* 평균 좋아요 */}
-      <td className="px-4 py-4 text-sm text-slate-700">
-        {formatNumber(avgLikes)}
+      <td className="px-4 py-4 text-sm text-slate-700 w-24">
+        <div className="flex items-center justify-end gap-1 w-full">
+          <span className="tabular-nums">{formatNumber(avgLikes)}</span>
+          <span className="w-[14px]" />
+        </div>
       </td>
 
       {/* 평균 댓글 */}
-      <td className="px-4 py-4 text-sm text-slate-700">
-        {formatNumber(avgComments)}
+      <td className="px-4 py-4 text-sm text-slate-700 w-20">
+        <div className="flex items-center justify-end gap-1 w-full">
+          <span className="tabular-nums">{formatNumber(avgComments)}</span>
+          <span className="w-[14px]" />
+        </div>
       </td>
 
       {/* 참여율 */}
-      <td className="px-4 py-4 text-sm text-slate-700">
-        {engagementRate !== null ? formatPercent(engagementRate, 2) : '-'}
+      <td className="px-4 py-4 text-sm text-slate-700 w-20">
+        <div className="flex items-center justify-end gap-1 w-full">
+          <span className="tabular-nums">{engagementRate !== null ? formatPercent(engagementRate, 2) : '-'}</span>
+          <span className="w-[14px]" />
+        </div>
       </td>
 
       {/* 최근 활동 */}
-      <td className="px-4 py-4 text-sm text-slate-700">
-        {formatDate(latestPostDate)}
+      <td className="px-4 py-4 text-sm text-slate-700 w-24">
+        <div className="flex items-center justify-center gap-1 w-full">
+          {formatDate(latestPostDate)}
+          <span className="w-[14px]" />
+        </div>
       </td>
 
       {/* 콘텐츠 썸네일 */}
-      <td className="px-4 py-4">
+      <td className="px-4 py-4 w-56">
         <div className="flex gap-1">
           {latestPosts.map((post, idx) => (
-            <img
+            <InstagramPostImage
               key={post.id || idx}
-              src={getProxiedImageUrl(post.displayUrl || post.images?.[0])}
+              originalUrl={post.displayUrl || post.images?.[0]}
+              shortCode={post.shortCode}
               alt={`Post ${idx + 1}`}
-              referrerPolicy="no-referrer"
-              className="w-16 h-16 object-cover rounded-lg bg-slate-200"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="%23e2e8f0"><rect width="64" height="64"/></svg>';
-              }}
+              className="w-16 h-16 object-cover rounded-lg"
             />
           ))}
           {latestPosts.length === 0 && (
@@ -287,29 +800,44 @@ function ActionBar({
   selectedCount,
   onAddToSeeding,
   onClearSelection,
+  isSeeding = false,
+  onRemoveFromSeeding,
 }: {
   selectedCount: number;
   onAddToSeeding: () => void;
   onClearSelection: () => void;
+  isSeeding?: boolean;
+  onRemoveFromSeeding?: () => void;
 }) {
   if (selectedCount === 0) return null;
 
   return (
-    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+    <div className={`${isSeeding ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'} border rounded-xl p-4 mb-4`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-orange-700">
-            <span className="text-orange-900 font-bold">{selectedCount}명</span> 선택됨
+          <span className={`text-sm font-medium ${isSeeding ? 'text-red-700' : 'text-orange-700'}`}>
+            <span className={`${isSeeding ? 'text-red-900' : 'text-orange-900'} font-bold`}>{selectedCount}명</span> 선택됨
           </span>
 
-          {/* 참여자로 추가 버튼 */}
-          <button
-            onClick={onAddToSeeding}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
-          >
-            <UserPlus size={14} />
-            참여자로 추가
-          </button>
+          {isSeeding ? (
+            /* 신청자로 되돌리기 버튼 */
+            <button
+              onClick={onRemoveFromSeeding}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+            >
+              <X size={14} />
+              신청자로 되돌리기
+            </button>
+          ) : (
+            /* 참여자로 추가 버튼 */
+            <button
+              onClick={onAddToSeeding}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+            >
+              <UserPlus size={14} />
+              참여자로 추가
+            </button>
+          )}
         </div>
 
         {/* 선택 취소 */}
@@ -361,6 +889,8 @@ export function ApplicantListTab({
   matchedInfluencers,
   onAddToSeeding,
   campaignId,
+  isSeeding = false,
+  onRemoveFromSeeding,
 }: ApplicantListTabProps) {
   // 필터 상태
   const [searchQuery, setSearchQuery] = useState('');
@@ -372,6 +902,10 @@ export function ApplicantListTab({
 
   // 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // 상세 모달 상태
+  const [selectedInfluencer, setSelectedInfluencer] = useState<DashInfluencerWithDetail | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // 정렬 핸들러
   const handleSort = (field: SortField) => {
@@ -499,9 +1033,18 @@ export function ApplicantListTab({
     setSelectedIds(new Set());
   }, [matchedInfluencers, selectedIds, campaignId, onAddToSeeding]);
 
+  // 신청자로 되돌리기
+  const handleRemoveFromSeeding = useCallback(() => {
+    if (onRemoveFromSeeding) {
+      onRemoveFromSeeding(Array.from(selectedIds));
+      setSelectedIds(new Set());
+    }
+  }, [selectedIds, onRemoveFromSeeding]);
+
   // 행 클릭 (현재는 아무 동작 없음 - 필요 시 상세 모달 추가 가능)
-  const handleRowClick = useCallback((_item: DashInfluencerWithDetail) => {
-    // 인플루언서 상세 모달 열기 (추후 구현 가능)
+  const handleRowClick = useCallback((item: DashInfluencerWithDetail) => {
+    setSelectedInfluencer(item);
+    setIsDetailModalOpen(true);
   }, []);
 
   return (
@@ -510,8 +1053,14 @@ export function ApplicantListTab({
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">신청자 리스트</h2>
-            <p className="text-sm text-slate-500">캠페인에 신청한 인플루언서 중 웰링크에 가입된 목록입니다.</p>
+            <h2 className="text-xl font-bold text-slate-900">
+              {isSeeding ? '참여 인플루언서' : '신청자 리스트'}
+            </h2>
+            <p className="text-sm text-slate-500">
+              {isSeeding
+                ? '캠페인에 참여하는 인플루언서 목록입니다.'
+                : '캠페인에 신청한 인플루언서 중 웰링크에 가입된 목록입니다.'}
+            </p>
           </div>
           <div className="text-sm text-slate-500">
             {sortedInfluencers.length > 0
@@ -543,6 +1092,8 @@ export function ApplicantListTab({
         selectedCount={selectedIds.size}
         onAddToSeeding={handleAddToSeeding}
         onClearSelection={handleClearSelection}
+        isSeeding={isSeeding}
+        onRemoveFromSeeding={handleRemoveFromSeeding}
       />
 
       {/* 테이블 */}
@@ -573,8 +1124,14 @@ export function ApplicantListTab({
         ) : (
           <div className="p-12 text-center">
             <Users size={48} className="mx-auto text-slate-300 mb-3" />
-            <div className="text-lg font-semibold text-slate-700 mb-1">매칭된 신청자가 없습니다</div>
-            <div className="text-sm text-slate-500">신청자 중 웰링크에 가입된 인플루언서가 없습니다.</div>
+            <div className="text-lg font-semibold text-slate-700 mb-1">
+              {isSeeding ? '참여 인플루언서가 없습니다' : '매칭된 신청자가 없습니다'}
+            </div>
+            <div className="text-sm text-slate-500">
+              {isSeeding
+                ? '신청자 리스트에서 인플루언서를 추가해주세요.'
+                : '신청자 중 웰링크에 가입된 인플루언서가 없습니다.'}
+            </div>
           </div>
         )}
 
@@ -625,6 +1182,16 @@ export function ApplicantListTab({
           </div>
         )}
       </div>
+
+      {/* 인플루언서 상세 모달 */}
+      <InfluencerDetailModal
+        item={selectedInfluencer}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedInfluencer(null);
+        }}
+      />
     </div>
   );
 }

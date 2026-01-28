@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { Client } from '@notionhq/client';
@@ -16,6 +17,7 @@ const DB_IDS = {
   campaigns: '2b708b1c-348f-8141-999f-f77b91095543',
   dailyReport: '2c308b1c348f808bacd0e465c92773aa',
   mentions: '2bd08b1c348f8023bf04fa37fc57d0b6',
+  applicants: '2b708b1c348f81b0a367e99677c3c0da', // 사계단백연구소 캠페인 접수 리스트
 };
 
 // ============================================
@@ -378,6 +380,79 @@ app.get('/api/seeding', async (req, res) => {
 });
 
 // ============================================
+// 신청자 API
+// ============================================
+
+// 신청자 목록 조회 (노션 DB에서)
+app.get('/api/applicants', async (req, res) => {
+  try {
+    // 페이지네이션으로 모든 결과 수집 (Notion API는 최대 100개씩 반환)
+    let allResults = [];
+    let hasMore = true;
+    let nextCursor = undefined;
+
+    while (hasMore) {
+      const response = await notion.databases.query({
+        database_id: DB_IDS.applicants,
+        sorts: [
+          {
+            property: '접수 일시',
+            direction: 'descending',
+          },
+        ],
+        start_cursor: nextCursor,
+      });
+
+      allResults = allResults.concat(response.results);
+      hasMore = response.has_more;
+      nextCursor = response.next_cursor;
+    }
+
+    console.log(`[ApplicantAPI] 총 ${allResults.length}명 조회됨`);
+
+    const applicants = allResults.map((page) => {
+      const props = page.properties;
+
+      // 접수 일시 추출
+      const appliedAt = props['접수 일시']?.date?.start || '';
+
+      // 이름 추출 (title 타입)
+      const name = props['이름']?.title?.[0]?.plain_text || '';
+
+      // 연락처 추출
+      const phoneNumber = props['연락처']?.phone_number || '';
+
+      // 인스타그램 ID 추출 (rich_text 타입)
+      const instagramId = props['인스타그램 ID']?.rich_text?.[0]?.plain_text || '';
+
+      // 한 줄 기대평 추출
+      const expectation = props['한 줄 기대평']?.rich_text?.[0]?.plain_text || '';
+
+      // 콘텐츠 2차 활용 동의 추출
+      const marketingConsent = props['콘텐츠 2차 활용 및 마케팅 이용 동의']?.checkbox || false;
+
+      return {
+        id: page.id,
+        name,
+        phoneNumber,
+        instagramId,
+        appliedAt,
+        expectation,
+        marketingConsent,
+      };
+    });
+
+    res.json({ applicants });
+  } catch (error) {
+    console.error('신청자 목록 조회 에러:', error);
+    res.status(500).json({
+      error: '신청자 목록을 불러오는데 실패했습니다.',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
 // 인증 API (프록시)
 // ============================================
 
@@ -399,6 +474,148 @@ app.post('/api/auth/login', async (req, res) => {
       responseCode: -1,
       message: '로그인 처리 중 오류가 발생했습니다.',
     });
+  }
+});
+
+// ============================================
+// Instagram 이미지 추출 API (CDN 만료 대응)
+// ============================================
+
+// 메모리 캐시 (24시간)
+const imageCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24시간
+
+// 캐시 정리 (1시간마다)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of imageCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      imageCache.delete(key);
+    }
+  }
+}, 60 * 60 * 1000);
+
+// og:image 메타태그 추출 함수
+function extractOgImage(html) {
+  // og:image 메타태그 패턴 (더 유연하게)
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      return match[1].replace(/&amp;/g, '&');
+    }
+  }
+  return null;
+}
+
+// Instagram 프로필 이미지 API
+app.get('/api/instagram-profile', async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    if (!username) {
+      return res.status(400).json({ error: 'username이 필요합니다.' });
+    }
+
+    const cacheKey = `profile:${username}`;
+    const cached = imageCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json({ imageUrl: cached.imageUrl, cached: true });
+    }
+
+    const response = await fetch(`https://www.instagram.com/${username}/`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: '프로필을 불러올 수 없습니다.' });
+    }
+
+    const html = await response.text();
+    console.log('[Profile] HTML length:', html.length, 'has og:image:', html.includes('og:image'));
+    const imageUrl = extractOgImage(html);
+    console.log('[Profile] Extracted:', imageUrl ? imageUrl.substring(0, 80) + '...' : null);
+
+    if (!imageUrl) {
+      return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+    }
+
+    // 캐시 저장
+    imageCache.set(cacheKey, { imageUrl, timestamp: Date.now() });
+
+    res.json({ imageUrl, cached: false });
+  } catch (error) {
+    console.error('Instagram 프로필 이미지 에러:', error);
+    res.status(500).json({ error: 'Instagram 프로필 이미지 추출 실패' });
+  }
+});
+
+// Instagram 게시물 이미지 API
+app.get('/api/instagram-post', async (req, res) => {
+  try {
+    const { shortCode } = req.query;
+
+    if (!shortCode) {
+      return res.status(400).json({ error: 'shortCode가 필요합니다.' });
+    }
+
+    const cacheKey = `post:${shortCode}`;
+    const cached = imageCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json({ imageUrl: cached.imageUrl, cached: true });
+    }
+
+    const response = await fetch(`https://www.instagram.com/p/${shortCode}/`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: '게시물을 불러올 수 없습니다.' });
+    }
+
+    const html = await response.text();
+    const imageUrl = extractOgImage(html);
+
+    if (!imageUrl) {
+      return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+    }
+
+    // 캐시 저장
+    imageCache.set(cacheKey, { imageUrl, timestamp: Date.now() });
+
+    res.json({ imageUrl, cached: false });
+  } catch (error) {
+    console.error('Instagram 게시물 이미지 에러:', error);
+    res.status(500).json({ error: 'Instagram 게시물 이미지 추출 실패' });
   }
 });
 

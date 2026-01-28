@@ -301,3 +301,43 @@ export function convertCampaignWithDetailToNotionCampaign(item: CampaignWithDeta
     spent: 0,
   };
 }
+
+// ============================================
+// 신청자 API
+// ============================================
+
+// 신청자 데이터 타입
+export interface ApplicantDto {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  instagramId: string;
+  appliedAt: string;
+  expectation: string;
+  marketingConsent: boolean;
+}
+
+export interface ApplicantApiResponse {
+  applicants: ApplicantDto[];
+}
+
+// 신청자 목록 조회 (노션 DB에서)
+export async function fetchApplicants(): Promise<ApplicantDto[]> {
+  // 로컬 개발 시 Vite 프록시 사용 (vite.config.ts에서 /api -> localhost:3001)
+  const url = '/api/applicants';
+  console.log('[ApplicantAPI] Fetching:', url);
+
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`신청자 조회 실패: ${response.status}`);
+  }
+
+  const data: ApplicantApiResponse = await response.json();
+  console.log('[ApplicantAPI] Response:', data);
+  return data.applicants || [];
+}

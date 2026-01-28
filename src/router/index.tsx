@@ -12,6 +12,7 @@ import { CampaignPage } from '../pages/dashboard/CampaignPage';
 import { CampaignDetailPage } from '../pages/dashboard/campaign/CampaignDetailPage';
 import { InfluencersPage } from '../pages/dashboard/InfluencersPage';
 import { InfluencerDetailPage } from '../pages/dashboard/influencers/InfluencerDetailPage';
+import { ApplicantsPage } from '../pages/dashboard/ApplicantsPage';
 
 export const router = createBrowserRouter([
   // 루트 경로 → 대시보드로 리다이렉트
@@ -87,6 +88,11 @@ export const router = createBrowserRouter([
       {
         path: 'influencers/:influencerId',
         element: <InfluencerDetailPage />,
+      },
+      // 캠페인 신청자
+      {
+        path: 'applicants',
+        element: <ApplicantsPage />,
       },
     ],
   },

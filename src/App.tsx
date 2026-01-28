@@ -8,6 +8,7 @@ import {
   Instagram,
   LogOut,
   Loader2,
+  ClipboardList,
 } from 'lucide-react';
 import type { PeriodType, SeedingItem } from './types';
 import { PeriodFilter } from './components/common/PeriodFilter';
@@ -15,6 +16,7 @@ import { ProfileTab } from './components/tabs/ProfileTab';
 import { AdsTab } from './components/tabs/AdsTab';
 import { CampaignTab } from './components/tabs/CampaignTab';
 import { InfluencersTab } from './components/tabs/InfluencersTab';
+import { ApplicantsTab } from './components/tabs/ApplicantsTab';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { useAuth } from './contexts/AuthContext';
@@ -35,7 +37,7 @@ import { useChannelTalk } from './hooks/useChannelTalk';
 import { syncDashMember, syncDashAd } from './services/metaDashApi';
 
 // 탭 타입
-type TabType = 'profile' | 'ads' | 'campaign' | 'influencers';
+type TabType = 'profile' | 'ads' | 'campaign' | 'influencers' | 'applicants';
 
 // ============================================
 // 메인 App 컴포넌트
@@ -170,6 +172,7 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
     { key: 'ads', label: '광고 성과', icon: TrendingUp },
     { key: 'campaign', label: '캠페인 관리', icon: Megaphone },
     { key: 'influencers', label: '인플루언서 리스트', icon: User },
+    { key: 'applicants', label: '캠페인 신청자', icon: ClipboardList },
   ];
 
   // 탭 전환 시 데이터 새로고침
@@ -289,8 +292,8 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Toolbar - 캠페인/인플루언서 탭에서는 숨김 */}
-        {activeTab !== 'campaign' && activeTab !== 'influencers' && (
+        {/* Toolbar - 캠페인/인플루언서/신청자 탭에서는 숨김 */}
+        {activeTab !== 'campaign' && activeTab !== 'influencers' && activeTab !== 'applicants' && (
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <PeriodFilter
               period={period}
@@ -362,6 +365,8 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
         )}
 
         {activeTab === 'influencers' && <InfluencersTab />}
+
+        {activeTab === 'applicants' && <ApplicantsTab />}
       </main>
 
       {/* Footer */}

@@ -12,6 +12,7 @@ export interface Brand {
 
 export interface User {
   id: string;
+  loginId: string; // 로그인할 때 입력한 아이디
   email: string;
   name: string;
   managerName?: string;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const apiUser = data.result[0];
         const user: User = {
           id: apiUser.id,
+          loginId: email, // 로그인 시 입력한 아이디 저장
           email: apiUser.email,
           name: apiUser.name,
           managerName: apiUser.managerName,

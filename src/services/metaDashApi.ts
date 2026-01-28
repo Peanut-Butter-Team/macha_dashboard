@@ -18,14 +18,22 @@ import type {
 
 const BASE_URL = 'https://matcha.pnutbutter.kr';
 
-// 공통 fetch 래퍼
+// 공통 fetch 래퍼 (30초 타임아웃 포함)
 async function fetchMetaDash<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
+  timeoutMs: number = 30000
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
 
   console.log('[MetaDashAPI] Request:', url);
+
+  // AbortController로 타임아웃 설정
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.log('[MetaDashAPI] Timeout reached, aborting request:', url);
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -33,8 +41,11 @@ async function fetchMetaDash<T>(
         'Content-Type': 'application/json',
         ...options?.headers,
       },
+      signal: controller.signal,
       ...options,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -50,6 +61,15 @@ async function fetchMetaDash<T>(
 
     return data;
   } catch (error) {
+    clearTimeout(timeoutId);
+
+    // 타임아웃 에러 처리
+    if (error instanceof Error && error.name === 'AbortError') {
+      const timeoutError = new Error(`API 요청 타임아웃 (${timeoutMs / 1000}초 초과)`);
+      console.error('[MetaDashAPI] Timeout Error:', timeoutError.message);
+      throw timeoutError;
+    }
+
     console.error('[MetaDashAPI] Error:', error);
     throw error;
   }
