@@ -914,12 +914,23 @@ export function InfluencersTab() {
     }
   };
 
-  // 활동 필터 → days 변환
+  // 활동 필터 → activityWithin 변환
   const getActivityDays = (filter: string): number | undefined => {
     switch (filter) {
       case 'week': return 7;
       case 'month': return 30;
       case '3months': return 90;
+      default: return undefined;
+    }
+  };
+
+  // 참여율 필터 → engagementMin 변환
+  const getEngagementMin = (filter: string): number | undefined => {
+    switch (filter) {
+      case 'over1': return 1;
+      case 'over3': return 3;
+      case 'over5': return 5;
+      case 'over10': return 10;
       default: return undefined;
     }
   };
@@ -932,15 +943,17 @@ export function InfluencersTab() {
 
         // 필터 파라미터 구성
         const followerRange = getFollowerRange(appliedFilters.follower);
-        const days = getActivityDays(appliedFilters.activity);
+        const activityWithin = getActivityDays(appliedFilters.activity);
+        const engagementMin = getEngagementMin(appliedFilters.engagement);
 
         const params = {
           page: currentPage + 1,
           size: PAGE_SIZE,
-          search: appliedFilters.search || undefined,
+          keyword: appliedFilters.search || undefined,
           category: appliedFilters.category !== 'all' ? appliedFilters.category : undefined,
           ...followerRange,
-          days
+          activityWithin,
+          engagementMin
         };
 
         // 서버 페이징 + 필터 사용
@@ -966,58 +979,8 @@ export function InfluencersTab() {
     appliedFilters.activity
   ]);
 
-  // 검색 및 필터링 (필터 모드일 때만 적용)
-  const filteredInfluencers = hasActiveFilter
-    ? influencersWithDetail.filter((item) => {
-        const inf = item?.dashInfluencer;
-        const detail = item?.dashInfluencerDetail;
-        const posts = detail?.latestPosts || [];
-
-        // inf가 없으면 필터에서 제외
-        if (!inf) return false;
-
-        // 검색 필터
-        const matchesSearch =
-          (inf.name ?? '').toLowerCase().includes(appliedFilters.search.toLowerCase()) ||
-          (inf.username ?? '').toLowerCase().includes(appliedFilters.search.toLowerCase());
-
-        // 카테고리 필터
-        const matchesCategory =
-          appliedFilters.category === 'all' || (inf.category?.includes(appliedFilters.category) ?? false);
-
-        // 팔로워수 필터
-        const followerCount = detail?.followersCount || inf.followerCount || 0;
-        let matchesFollower = true;
-        if (appliedFilters.follower === 'under1k') matchesFollower = followerCount < 1000;
-        else if (appliedFilters.follower === '1k-10k') matchesFollower = followerCount >= 1000 && followerCount < 10000;
-        else if (appliedFilters.follower === '10k-50k') matchesFollower = followerCount >= 10000 && followerCount < 50000;
-        else if (appliedFilters.follower === '50k-100k') matchesFollower = followerCount >= 50000 && followerCount < 100000;
-        else if (appliedFilters.follower === 'over100k') matchesFollower = followerCount >= 100000;
-
-        // 참여율 필터
-        const avgLikes = posts.length > 0 ? posts.reduce((s, p) => s + (p.likesCount || 0), 0) / posts.length : 0;
-        const avgComments = posts.length > 0 ? posts.reduce((s, p) => s + (p.commentsCount || 0), 0) / posts.length : 0;
-        const engagementRate = followerCount > 0 ? ((avgLikes + avgComments) / followerCount) * 100 : 0;
-        let matchesEngagement = true;
-        if (appliedFilters.engagement === 'over1') matchesEngagement = engagementRate >= 1;
-        else if (appliedFilters.engagement === 'over3') matchesEngagement = engagementRate >= 3;
-        else if (appliedFilters.engagement === 'over5') matchesEngagement = engagementRate >= 5;
-        else if (appliedFilters.engagement === 'over10') matchesEngagement = engagementRate >= 10;
-
-        // 최근 활동 필터
-        const latestPostTime = posts.length > 0 ? Math.max(...posts.map(p => new Date(p.timestamp).getTime())) : 0;
-        const now = Date.now();
-        const oneWeek = 7 * 24 * 60 * 60 * 1000;
-        const oneMonth = 30 * 24 * 60 * 60 * 1000;
-        const threeMonths = 90 * 24 * 60 * 60 * 1000;
-        let matchesActivity = true;
-        if (appliedFilters.activity === 'week') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= oneWeek;
-        else if (appliedFilters.activity === 'month') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= oneMonth;
-        else if (appliedFilters.activity === '3months') matchesActivity = latestPostTime > 0 && (now - latestPostTime) <= threeMonths;
-
-        return matchesSearch && matchesCategory && matchesFollower && matchesEngagement && matchesActivity;
-      })
-    : influencersWithDetail; // 서버 페이징 모드: 필터링 없이 그대로 사용
+  // 서버에서 필터링된 결과를 그대로 사용 (클라이언트 필터링 제거)
+  const filteredInfluencers = influencersWithDetail;
 
   // 정렬 (필터 모드일 때만 클라이언트 정렬 적용)
   const sortedInfluencers = hasActiveFilter
@@ -1073,22 +1036,10 @@ export function InfluencersTab() {
       })
     : filteredInfluencers; // 서버 페이징 모드: 서버에서 받은 순서 그대로 사용
 
-  // 페이지네이션 계산
-  // 필터 있음: 클라이언트 페이지네이션
-  // 필터 없음: 서버 페이지네이션 (이미 페이징된 데이터)
-  const totalPages = hasActiveFilter
-    ? Math.ceil(sortedInfluencers.length / PAGE_SIZE)
-    : serverTotalPages;
-  const totalElements = hasActiveFilter
-    ? sortedInfluencers.length
-    : serverTotalElements;
-  const startIdx = hasActiveFilter ? currentPage * PAGE_SIZE : 0;
-  const endIdx = hasActiveFilter
-    ? Math.min(startIdx + PAGE_SIZE, sortedInfluencers.length)
-    : sortedInfluencers.length;
-  const paginatedInfluencers = hasActiveFilter
-    ? sortedInfluencers.slice(startIdx, endIdx)
-    : sortedInfluencers; // 서버 페이징 시 이미 페이징된 데이터
+  // 페이지네이션 계산 - 항상 서버 페이지네이션 사용
+  const totalPages = serverTotalPages;
+  const totalElements = serverTotalElements;
+  const paginatedInfluencers = sortedInfluencers;
 
   // 카테고리 목록 추출
   const allCategories = Array.from(
