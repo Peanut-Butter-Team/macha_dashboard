@@ -210,26 +210,28 @@ export async function updateDashInfluencer(
 export interface FetchInfluencersParams {
   page?: number;
   size?: number;
-  search?: string;
+  keyword?: string;
   category?: string;
   followerMin?: number;
   followerMax?: number;
-  days?: number;
+  activityWithin?: number;
+  engagementMin?: number;
 }
 
 export async function fetchDashInfluencersWithDetail(
   params: FetchInfluencersParams = {}
 ): Promise<PageResponse<DashInfluencerWithDetail>> {
-  const { page = 0, size = 15, search, category, followerMin, followerMax, days } = params;
+  const { page = 0, size = 15, keyword, category, followerMin, followerMax, activityWithin, engagementMin } = params;
 
   const queryParams = new URLSearchParams();
   queryParams.append('page', String(page));
   queryParams.append('size', String(size));
-  if (search) queryParams.append('search', search);
+  if (keyword) queryParams.append('keyword', keyword);
   if (category) queryParams.append('category', category);
   if (followerMin !== undefined) queryParams.append('followerMin', String(followerMin));
   if (followerMax !== undefined) queryParams.append('followerMax', String(followerMax));
-  if (days !== undefined) queryParams.append('days', String(days));
+  if (activityWithin !== undefined) queryParams.append('activityWithin', String(activityWithin));
+  if (engagementMin !== undefined) queryParams.append('engagementMin', String(engagementMin));
 
   const response = await fetchMetaDash<MetaDashResponse<PageResponse<DashInfluencerWithDetail>[]>>(
     `/api/v1/dash-influencers/list-with-detail?${queryParams.toString()}`

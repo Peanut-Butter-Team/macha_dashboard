@@ -2,7 +2,6 @@
  * 이미지 URL 처리 유틸리티
  *
  * S3/CloudFront 상대 경로를 완전한 URL로 변환
- * Instagram/Facebook CDN URL은 서버 프록시를 통해 요청
  */
 
 // CloudFront 베이스 URL
@@ -21,15 +20,12 @@ export function getProxiedImageUrl(url: string | null | undefined): string {
   if (!url) return '';
 
   // S3/CloudFront 상대 경로인 경우 베이스 URL 추가
-  if (url.startsWith('/matcha/')) {
-    return `${CLOUDFRONT_BASE_URL}${url}`;
+  if (url.startsWith('/matcha/') || url.startsWith('matcha/')) {
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${CLOUDFRONT_BASE_URL}${path}`;
   }
 
-  // Instagram/Facebook CDN → 서버 프록시를 통해 요청
-  if (url.includes('instagram') || url.includes('fbcdn') || url.includes('cdninstagram')) {
-    return `${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`;
-  }
-
+  // Instagram CDN URL은 그대로 반환 (프록시 제거)
   return url;
 }
 
