@@ -105,7 +105,6 @@ export interface FetchCampaignsWithDetailParams {
   page?: number;
   size?: number;
   direction?: 'ASC' | 'DESC';
-  dashMemberId?: string;
 }
 
 export interface CampaignWithDetail {
@@ -247,15 +246,12 @@ export async function fetchCampaignsWithDetail(
 ): Promise<PageResponse<CampaignWithDetail>> {
   const baseUrl = import.meta.env.VITE_CAMPAIGN_API_URL || 'https://matcha.pnutbutter.kr';
 
-  const { page = 1, size = 10, direction = 'DESC', dashMemberId } = params;
+  const { page = 1, size = 10, direction = 'DESC' } = params;
 
   const queryParams = new URLSearchParams();
   queryParams.append('page', String(page));
   queryParams.append('size', String(size));
   queryParams.append('direction', direction);
-  if (dashMemberId) {
-    queryParams.append('dashMemberId', dashMemberId);
-  }
 
   const url = `${baseUrl}/api/v1/dash-campaigns/list-with-detail?${queryParams.toString()}`;
   console.log('[CampaignAPI] Fetching campaigns with detail:', url);
