@@ -454,6 +454,10 @@ app.get('/api/applicants', async (req, res) => {
       };
     });
 
+    // 브라우저 캐시 비활성화 (계정 전환 시 캐시된 데이터 반환 방지)
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({ applicants });
   } catch (error) {
     console.error('신청자 목록 조회 에러:', error);

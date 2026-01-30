@@ -324,12 +324,14 @@ export interface ApplicantApiResponse {
 }
 
 // 신청자 목록 조회 (노션 DB에서)
-// loginId로 계정별 노션 DB 조회
-export async function fetchApplicants(loginId?: string): Promise<ApplicantDto[]> {
+// loginId로 계정별, campaignId로 캠페인별 노션 DB 조회
+export async function fetchApplicants(loginId?: string, campaignId?: string): Promise<ApplicantDto[]> {
   // 로컬 개발 시 Vite 프록시 사용 (vite.config.ts에서 /api -> localhost:3001)
-  const url = loginId
-    ? `/api/applicants?loginId=${encodeURIComponent(loginId)}`
-    : '/api/applicants';
+  const params = new URLSearchParams();
+  if (loginId) params.append('loginId', loginId);
+  if (campaignId) params.append('campaignId', campaignId);
+
+  const url = params.toString() ? `/api/applicants?${params.toString()}` : '/api/applicants';
   console.log('[ApplicantAPI] Fetching:', url);
 
   const response = await fetch(url, {

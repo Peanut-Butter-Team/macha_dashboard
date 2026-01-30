@@ -1295,8 +1295,8 @@ function CampaignDetailView({
 
       console.log('[CampaignDetail] Loading applicants and influencer data...');
 
-      // 1. 노션에서 신청자 데이터 로드 (loginId로 계정별 DB 조회)
-      const applicants = await fetchApplicants(user?.loginId);
+      // 1. 노션에서 신청자 데이터 로드 (loginId로 계정별, campaignId로 캠페인별 DB 조회)
+      const applicants = await fetchApplicants(user?.loginId, campaign.id);
       console.log('[CampaignDetail] Loaded applicants:', applicants.length);
       setApplicantsRaw(applicants);
 

@@ -19,61 +19,77 @@ import type {
 
 const BASE_URL = 'https://matcha.pnutbutter.kr';
 
-// 공통 fetch 래퍼 (30초 타임아웃 포함)
+// 공통 fetch 래퍼 (30초 타임아웃 + 재시도 로직 포함)
 async function fetchMetaDash<T>(
   endpoint: string,
   options?: RequestInit,
-  timeoutMs: number = 30000
+  timeoutMs: number = 30000,
+  maxRetries: number = 3
 ): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
+  let lastError: Error | null = null;
 
-  console.log('[MetaDashAPI] Request:', url);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[MetaDashAPI] Request (attempt ${attempt}/${maxRetries}):`, url);
 
-  // AbortController로 타임아웃 설정
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    console.log('[MetaDashAPI] Timeout reached, aborting request:', url);
-    controller.abort();
-  }, timeoutMs);
+    // AbortController로 타임아웃 설정
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('[MetaDashAPI] Timeout reached, aborting request:', url);
+      controller.abort();
+    }, timeoutMs);
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-      signal: controller.signal,
-      ...options,
-    });
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+        signal: controller.signal,
+        ...options,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[MetaDashAPI] Response:', data);
+
+      // responseCode 체크
+      if (data.responseCode && data.responseCode !== 0 && data.responseCode !== 200) {
+        throw new Error(`API Error Code: ${data.responseCode} - ${data.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // 타임아웃 에러 처리
+      if (error instanceof Error && error.name === 'AbortError') {
+        lastError = new Error(`API 요청 타임아웃 (${timeoutMs / 1000}초 초과)`);
+      }
+
+      // 네트워크 에러 (QUIC, Failed to fetch 등)는 재시도
+      const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
+      const isRetryable = isNetworkError || (error instanceof Error && error.name === 'AbortError');
+
+      if (isRetryable && attempt < maxRetries) {
+        const delay = attempt * 1000; // 1초, 2초, 3초 점진적 대기
+        console.log(`[MetaDashAPI] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      console.error('[MetaDashAPI] Error:', lastError);
+      throw lastError;
     }
-
-    const data = await response.json();
-    console.log('[MetaDashAPI] Response:', data);
-
-    // responseCode 체크
-    if (data.responseCode && data.responseCode !== 0 && data.responseCode !== 200) {
-      throw new Error(`API Error Code: ${data.responseCode} - ${data.message}`);
-    }
-
-    return data;
-  } catch (error) {
-    clearTimeout(timeoutId);
-
-    // 타임아웃 에러 처리
-    if (error instanceof Error && error.name === 'AbortError') {
-      const timeoutError = new Error(`API 요청 타임아웃 (${timeoutMs / 1000}초 초과)`);
-      console.error('[MetaDashAPI] Timeout Error:', timeoutError.message);
-      throw timeoutError;
-    }
-
-    console.error('[MetaDashAPI] Error:', error);
-    throw error;
   }
+
+  throw lastError || new Error('Unknown error');
 }
 
 // 1. 프로필 동기화 (금일 데이터 갱신)
