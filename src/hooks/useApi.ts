@@ -32,8 +32,7 @@ import {
   fetchDashFollowers,
   fetchDashFollowerInsight,
   fetchDashMedias,
-  fetchDashAdList,
-  fetchDashAdCampaignDetail,
+  fetchDashAdInsight,
 } from '../services/metaDashApi';
 import {
   mapToProfileInsight,
@@ -44,6 +43,7 @@ import {
   mapToDailyAdDataFromCampaignDetail,
   mapToCampaignPerformanceFromCampaignDetail,
   mapToCampaignHierarchyFromCampaignDetail,
+  convertInsightsToCampaignDetail,
 } from '../utils/metaDashMapper';
 
 // ============================================
@@ -219,19 +219,14 @@ export function useAdPerformance(userId?: string): ApiResponse<AdPerformanceResu
     setError(null);
 
     try {
-      // 1. 캠페인 목록 조회
-      const campaignList = await fetchDashAdList(userId);
+      // 단일 API 호출로 모든 광고 데이터 조회
+      const today = new Date().toISOString().split('T')[0];
+      const accountsWithInsights = await fetchDashAdInsight(userId, today);
 
-      // 2. 각 캠페인별 상세 조회 (병렬 처리)
-      const campaignDetailPromises = campaignList.map(item =>
-        fetchDashAdCampaignDetail(userId, item.dashAdCampaign.id)
-      );
-      const campaignDetailsResults = await Promise.all(campaignDetailPromises);
+      // 어댑터로 기존 매퍼가 기대하는 형태로 변환
+      const allCampaignDetails = convertInsightsToCampaignDetail(accountsWithInsights);
 
-      // 3. 모든 상세 데이터 합치기
-      const allCampaignDetails = campaignDetailsResults.flat();
-
-      // 4. 데이터 변환
+      // 데이터 변환
       const adPerformance = mapToAdPerformanceFromCampaignDetail(allCampaignDetails);
       const campaignData = mapToCampaignPerformanceFromCampaignDetail(allCampaignDetails);
       const campaignHierarchy = mapToCampaignHierarchyFromCampaignDetail(allCampaignDetails);
@@ -281,35 +276,26 @@ export function useDailyAdData(period: string, userId?: string): ApiResponse<Dai
     setError(null);
 
     try {
-      // 1. 캠페인 목록 조회
-      const campaignList = await fetchDashAdList(userId);
+      // 단일 API 호출로 모든 광고 데이터 조회
+      const today = new Date().toISOString().split('T')[0];
+      const accountsWithInsights = await fetchDashAdInsight(userId, today);
 
-      // 2. 각 캠페인별 상세 조회 (병렬 처리)
-      const campaignDetailPromises = campaignList.map(item =>
-        fetchDashAdCampaignDetail(userId, item.dashAdCampaign.id)
-      );
-      const campaignDetailsResults = await Promise.all(campaignDetailPromises);
+      // 어댑터로 기존 매퍼가 기대하는 형태로 변환
+      const allCampaignDetails = convertInsightsToCampaignDetail(accountsWithInsights);
 
-      // 3. 모든 상세 데이터 합치기
-      const allCampaignDetails = campaignDetailsResults.flat();
-
-      // 4. 서버 동기화 시간 추출 (가장 최근 lastSyncedAt)
+      // 서버 동기화 시간 추출 (광고 계정의 lastSyncedAt)
       const syncTimes: Date[] = [];
-      allCampaignDetails.forEach(detail => {
-        detail.adDetailResponseObjs?.forEach(adDetail => {
-          adDetail.adSetChildObjs?.forEach(child => {
-            if (child.dashAdAccountInsight?.lastSyncedAt) {
-              syncTimes.push(new Date(child.dashAdAccountInsight.lastSyncedAt));
-            }
-          });
-        });
+      accountsWithInsights.forEach(account => {
+        if (account.dashAdAccount?.lastSyncedAt) {
+          syncTimes.push(new Date(account.dashAdAccount.lastSyncedAt));
+        }
       });
       if (syncTimes.length > 0) {
         const latestSyncTime = syncTimes.sort((a, b) => b.getTime() - a.getTime())[0];
         setServerSyncTime(latestSyncTime);
       }
 
-      // 5. 데이터 변환
+      // 데이터 변환
       const dailyData = mapToDailyAdDataFromCampaignDetail(allCampaignDetails);
       setData(dailyData);
       setError(null);
