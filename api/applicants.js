@@ -2,9 +2,16 @@ import { Client } from '@notionhq/client';
 
 const notion = new Client({ auth: (process.env.NOTION_TOKEN || '').trim() });
 
-// 사계단백연구소 캠페인 접수 리스트 DB ID
+// 기본 신청자 DB ID
 const DB_IDS = {
-  applicants: '2b708b1c348f81b0a367e99677c3c0da',
+  applicants: '2b708b1c348f81b0a367e99677c3c0da', // 사계단백 (기본값)
+};
+
+// 계정별 신청자 DB 매핑
+const ACCOUNT_APPLICANTS_DB = {
+  'w365299': '2b708b1c348f81b0a367e99677c3c0da',      // 사계단백
+  'ehddls5151@': '2b708b1c348f81b0a367e99677c3c0da',  // 사계단백
+  'sweatif': '2f508b1c348f808a86b1d5596fcf0cfe',      // 스웻이프
 };
 
 export default async function handler(req, res) {
@@ -13,11 +20,21 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // 캐시 비활성화 (계정 전환 시 캐시된 데이터 반환 방지)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
+    // loginId로 해당 계정의 DB 조회
+    const { loginId } = req.query;
+    const dbId = ACCOUNT_APPLICANTS_DB[loginId] || DB_IDS.applicants;
+    console.log(`[ApplicantAPI] loginId: ${loginId}, dbId: ${dbId}`);
+
     // 페이지네이션으로 모든 결과 수집 (Notion API는 최대 100개씩 반환)
     let allResults = [];
     let hasMore = true;
@@ -25,7 +42,7 @@ export default async function handler(req, res) {
 
     while (hasMore) {
       const response = await notion.databases.query({
-        database_id: DB_IDS.applicants,
+        database_id: dbId,
         sorts: [
           {
             property: '접수 일시',
