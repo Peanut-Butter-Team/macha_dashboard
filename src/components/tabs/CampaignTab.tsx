@@ -40,8 +40,8 @@ import {
   type CampaignResultDto,
   type CampaignWithDetail,
 } from '../../services/notionApi';
-import { fetchDashInfluencersWithDetail, participateCampaignInfluencer } from '../../services/metaDashApi';
-import type { DashInfluencerWithDetail } from '../../types/metaDash';
+import { fetchDashInfluencersWithDetail, participateCampaignInfluencer, fetchCampaignParticipants, updateParticipantStatus } from '../../services/metaDashApi';
+import type { DashInfluencerWithDetail, DashCampaignInfluencerParticipate } from '../../types/metaDash';
 import type {
   Influencer,
   SeedingItem,
@@ -62,8 +62,11 @@ interface CampaignTabProps {
   loading: boolean;
 }
 
-// localStorage 키 (캠페인별 참여 인플루언서 저장)
-const SEEDING_STORAGE_KEY = (campaignId: string) => `seeding_${campaignId}`;
+// 참여 인플루언서 상태 상수 (API 상태값)
+const PARTICIPANT_STATUS = {
+  WAIT: 'WAIT',     // 대기
+  ACTIVE: 'ACTIVE', // 참여
+} as const;
 
 // 캠페인 목록 타입 (Notion 데이터와 호환)
 interface CampaignListItem {
@@ -1137,22 +1140,13 @@ function CampaignDetailView({
   // 매칭된 인플루언서 (신청자 리스트에 표시)
   const [matchedInfluencers, setMatchedInfluencers] = useState<DashInfluencerWithDetail[]>([]);
   // 참여자로 추가된 인플루언서 ID 목록 (신청자 리스트에서 필터링용)
-  // localStorage에서 초기값 로드
-  const [addedToSeedingIds, setAddedToSeedingIds] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem(SEEDING_STORAGE_KEY(campaign.id));
-    if (saved) {
-      try {
-        const savedIds = JSON.parse(saved) as string[];
-        console.log('[CampaignDetail] 초기 로드:', savedIds.length, '명');
-        return new Set(savedIds);
-      } catch (e) {
-        console.error('[CampaignDetail] localStorage 파싱 실패:', e);
-      }
-    }
-    return new Set();
-  });
+  // API에서 로드하도록 변경 (localStorage 초기화 제거)
+  const [addedToSeedingIds, setAddedToSeedingIds] = useState<Set<string>>(new Set());
   // 신청자에서 참여자로 추가된 인플루언서 (상세 정보 유지)
   const [addedInfluencers, setAddedInfluencers] = useState<DashInfluencerWithDetail[]>([]);
+  // API에서 조회한 참여자 목록
+  const [participants, setParticipants] = useState<DashCampaignInfluencerParticipate[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
   const [notionContent, setNotionContent] = useState<ContentItem[]>([]);
   const [_campaignResults, setCampaignResults] = useState<CampaignResultDto[]>([]);
   const [detailLoading, setDetailLoading] = useState(true);
@@ -1329,18 +1323,55 @@ function CampaignDetailView({
     loadApplicantsAndMatch();
   }, [campaign.id]);
 
-  // matchedInfluencers 로드 후 addedInfluencers 복원
-  useEffect(() => {
-    if (matchedInfluencers.length > 0 && addedToSeedingIds.size > 0) {
-      const restoredInfluencers = matchedInfluencers.filter(
-        inf => addedToSeedingIds.has(inf.dashInfluencer.id)
+  // 캠페인 참여자 목록 API 조회
+  const loadParticipants = async () => {
+    try {
+      setParticipantsLoading(true);
+      console.log('[CampaignDetail] 참여자 목록 API 조회 시작:', campaign.id);
+
+      const data = await fetchCampaignParticipants(campaign.id);
+      setParticipants(data);
+
+      // ACTIVE 상태인 참여자만 필터링하여 ID Set 생성
+      // status가 없으면 WAIT로 간주 (신청자 탭에 표시)
+      const activeParticipantIds = new Set(
+        data.filter(p => (p.status || 'WAIT') === PARTICIPANT_STATUS.ACTIVE).map(p => p.dashInfluencer.id)
       );
-      if (restoredInfluencers.length > 0) {
-        console.log('[CampaignDetail] 참여 인플루언서 복원:', restoredInfluencers.length, '명');
-        setAddedInfluencers(restoredInfluencers);
-      }
+      setAddedToSeedingIds(activeParticipantIds);
+
+      console.log('[CampaignDetail] 참여자 조회 완료 - 전체:', data.length, '명, ACTIVE:', activeParticipantIds.size, '명');
+    } catch (error) {
+      console.error('[CampaignDetail] 참여자 조회 실패:', error);
+    } finally {
+      setParticipantsLoading(false);
     }
-  }, [matchedInfluencers, addedToSeedingIds]);
+  };
+
+  // 캠페인 선택 시 참여자 데이터 API로 로드
+  useEffect(() => {
+    loadParticipants();
+  }, [campaign.id]);
+
+  // participants 로드 후 addedInfluencers 매칭
+  useEffect(() => {
+    // ACTIVE 상태인 참여자만 addedInfluencers에 설정
+    // status가 없으면 WAIT로 간주 (신청자 탭에 표시)
+    const activeParticipants = participants.filter(p => (p.status || 'WAIT') === PARTICIPANT_STATUS.ACTIVE);
+    if (activeParticipants.length > 0) {
+      // matchedInfluencers에서 매칭되는 항목 찾기, 없으면 API 응답 데이터로 구성
+      const participantInfluencers = activeParticipants.map(p => {
+        const matched = matchedInfluencers.find(
+          m => m.dashInfluencer.id === p.dashInfluencer.id
+        );
+        return matched || {
+          dashInfluencer: p.dashInfluencer,
+          dashInfluencerDetail: null
+        };
+      });
+      setAddedInfluencers(participantInfluencers);
+      console.log('[CampaignDetail] addedInfluencers 설정:', participantInfluencers.length, '명');
+    }
+  }, [participants, matchedInfluencers]);
 
   return (
     <div className="space-y-6">
@@ -1422,39 +1453,36 @@ function CampaignDetailView({
                 onAddToSeeding={async (newItems) => {
                   // API 호출: 각 인플루언서를 캠페인 참여자로 등록
                   try {
+                    // 1. POST 호출 - 참여자 등록 (초기 상태: WAIT)
                     const apiPromises = newItems.map(item =>
                       participateCampaignInfluencer(campaign.id, item.influencer.id)
                     );
-                    await Promise.all(apiPromises);
-                    console.log('[CampaignDetail] API 호출 성공:', newItems.length, '명');
-                  } catch (error) {
-                    console.error('[CampaignDetail] API 호출 실패:', error);
-                    // API 실패해도 localStorage에는 저장 (오프라인 대응)
-                  }
+                    const results = await Promise.all(apiPromises);
+                    console.log('[CampaignDetail] 참여자 등록 성공:', newItems.length, '명');
 
-                  setNotionSeeding(prev => [...prev, ...newItems]);
-                  // 추가된 인플루언서 ID를 기록하여 신청자 리스트에서 제외
-                  const newIds = new Set(newItems.map(item => item.influencer.id));
-                  setAddedToSeedingIds(prev => {
-                    const updated = new Set([...prev, ...newIds]);
-                    // localStorage에 저장
-                    localStorage.setItem(SEEDING_STORAGE_KEY(campaign.id), JSON.stringify([...updated]));
-                    console.log('[CampaignDetail] localStorage 저장 (추가):', updated.size, '명');
-                    return updated;
-                  });
-                  // 추가된 인플루언서의 상세 정보 유지 (UI 동일하게 표시용)
-                  const addedItems = matchedInfluencers.filter(inf => newIds.has(inf.dashInfluencer.id));
-                  setAddedInfluencers(prev => [...prev, ...addedItems]);
+                    // 2. PUT 호출 - 상태를 ACTIVE로 변경
+                    // API 응답에서 participateId 추출 (응답 구조에 따라 조정 필요)
+                    const participateIds = results.flatMap(r => r.map(p => p.dashInfluencer?.id)).filter(Boolean);
+                    if (participateIds.length > 0) {
+                      await updateParticipantStatus(participateIds, 'ACTIVE');
+                      console.log('[CampaignDetail] 상태 ACTIVE로 변경:', participateIds.length, '명');
+                    }
+
+                    // 3. 참여자 목록 새로고침
+                    await loadParticipants();
+                  } catch (error) {
+                    console.error('[CampaignDetail] 참여자 등록 실패:', error);
+                  }
                 }}
                 campaignId={campaign.id}
               />
             )
           )}
           {activeSubTab === 'seeding' && (
-            detailLoading ? (
+            participantsLoading ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center h-32">
                 <Loader2 className="w-6 h-6 animate-spin mr-2 text-primary-600" />
-                <span className="text-slate-500">인플루언서 데이터 로딩 중...</span>
+                <span className="text-slate-500">참여 인플루언서 데이터 로딩 중...</span>
               </div>
             ) : (
               <ApplicantListTab
@@ -1462,19 +1490,17 @@ function CampaignDetailView({
                 onAddToSeeding={() => {}}
                 campaignId={campaign.id}
                 isSeeding={true}
-                onRemoveFromSeeding={(influencerIds) => {
-                  // 신청자 리스트로 되돌리기
-                  setAddedToSeedingIds(prev => {
-                    const newSet = new Set(prev);
-                    influencerIds.forEach(id => newSet.delete(id));
-                    // localStorage에 저장
-                    localStorage.setItem(SEEDING_STORAGE_KEY(campaign.id), JSON.stringify([...newSet]));
-                    console.log('[CampaignDetail] localStorage 저장 (제거):', newSet.size, '명');
-                    return newSet;
-                  });
-                  setAddedInfluencers(prev => prev.filter(inf => !influencerIds.includes(inf.dashInfluencer.id)));
-                  // notionSeeding에서도 해당 항목 제거
-                  setNotionSeeding(prev => prev.filter(item => !influencerIds.includes(item.influencer.id)));
+                onRemoveFromSeeding={async (influencerIds) => {
+                  // API 호출: 상태를 WAIT로 변경하여 신청자 리스트로 되돌리기
+                  try {
+                    await updateParticipantStatus(influencerIds, 'WAIT');
+                    console.log('[CampaignDetail] 상태 WAIT로 변경:', influencerIds.length, '명');
+
+                    // 참여자 목록 새로고침
+                    await loadParticipants();
+                  } catch (error) {
+                    console.error('[CampaignDetail] 참여자 상태 변경 실패:', error);
+                  }
                 }}
               />
             )

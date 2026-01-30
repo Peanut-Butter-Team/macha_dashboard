@@ -288,3 +288,31 @@ export async function participateCampaignInfluencer(
   );
   return response.result || [];
 }
+
+// 13. 캠페인 참여자 목록 조회
+export async function fetchCampaignParticipants(
+  campaignId: string
+): Promise<DashCampaignInfluencerParticipate[]> {
+  const response = await fetchMetaDash<MetaDashResponse<DashCampaignInfluencerParticipate[]>>(
+    `/api/v1/dash-campaign-influencer-participate/${campaignId}`
+  );
+  return response.result || [];
+}
+
+// 14. 캠페인 참여자 상태 변경 (WAIT: 대기, ACTIVE: 참여)
+export async function updateParticipantStatus(
+  participateIds: string[],
+  newStatus: 'WAIT' | 'ACTIVE'
+): Promise<boolean> {
+  const response = await fetchMetaDash<MetaDashResponse<boolean[]>>(
+    `/api/v1/dash-campaign-influencer-participate/status`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        participateIds,
+        newStatus,
+      }),
+    }
+  );
+  return response.result?.[0] ?? false;
+}
