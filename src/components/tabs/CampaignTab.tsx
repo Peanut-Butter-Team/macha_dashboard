@@ -1370,6 +1370,9 @@ function CampaignDetailView({
       });
       setAddedInfluencers(participantInfluencers);
       console.log('[CampaignDetail] addedInfluencers 설정:', participantInfluencers.length, '명');
+    } else {
+      setAddedInfluencers([]);
+      console.log('[CampaignDetail] addedInfluencers 초기화: 0명');
     }
   }, [participants, matchedInfluencers]);
 
