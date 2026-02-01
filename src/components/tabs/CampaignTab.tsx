@@ -1354,6 +1354,9 @@ function CampaignDetailView({
 
   // participants 로드 후 addedInfluencers 매칭
   useEffect(() => {
+    // 로딩 중이면 업데이트하지 않음 (깜빡임 방지)
+    if (participantsLoading) return;
+
     // ACTIVE 상태인 참여자만 addedInfluencers에 설정
     // status가 없으면 WAIT로 간주 (신청자 탭에 표시)
     const activeParticipants = participants.filter(p => (p.status || 'WAIT') === PARTICIPANT_STATUS.ACTIVE);
@@ -1374,7 +1377,7 @@ function CampaignDetailView({
       setAddedInfluencers([]);
       console.log('[CampaignDetail] addedInfluencers 초기화: 0명');
     }
-  }, [participants, matchedInfluencers]);
+  }, [participants, matchedInfluencers, participantsLoading]);
 
   return (
     <div className="space-y-6">
