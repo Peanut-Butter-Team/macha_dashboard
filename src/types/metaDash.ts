@@ -431,6 +431,7 @@ export interface DashCampaign {
 
 // 23. 캠페인-인플루언서 참여 응답 아이템
 export interface DashCampaignInfluencerParticipate {
+  id: string; // 참여 레코드 고유 ID
   dashCampaign: DashCampaign;
   dashInfluencer: DashInfluencer;
   status: string;

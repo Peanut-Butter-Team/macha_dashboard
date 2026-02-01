@@ -1461,8 +1461,8 @@ function CampaignDetailView({
                     console.log('[CampaignDetail] 참여자 등록 성공:', newItems.length, '명');
 
                     // 2. PUT 호출 - 상태를 ACTIVE로 변경
-                    // API 응답에서 participateId 추출 (응답 구조에 따라 조정 필요)
-                    const participateIds = results.flatMap(r => r.map(p => p.dashInfluencer?.id)).filter(Boolean);
+                    // API 응답에서 참여 레코드 ID 추출
+                    const participateIds = results.flatMap(r => r.map(p => p.id)).filter(Boolean);
                     if (participateIds.length > 0) {
                       await updateParticipantStatus(participateIds, 'ACTIVE');
                       console.log('[CampaignDetail] 상태 ACTIVE로 변경:', participateIds.length, '명');
@@ -1493,8 +1493,15 @@ function CampaignDetailView({
                 onRemoveFromSeeding={async (influencerIds) => {
                   // API 호출: 상태를 WAIT로 변경하여 신청자 리스트로 되돌리기
                   try {
-                    await updateParticipantStatus(influencerIds, 'WAIT');
-                    console.log('[CampaignDetail] 상태 WAIT로 변경:', influencerIds.length, '명');
+                    // 인플루언서 ID → 참여 레코드 ID 변환
+                    const participateIds = participants
+                      .filter(p => influencerIds.includes(p.dashInfluencer.id))
+                      .map(p => p.id);
+
+                    if (participateIds.length > 0) {
+                      await updateParticipantStatus(participateIds, 'WAIT');
+                      console.log('[CampaignDetail] 상태 WAIT로 변경:', participateIds.length, '명');
+                    }
 
                     // 참여자 목록 새로고침
                     await loadParticipants();
