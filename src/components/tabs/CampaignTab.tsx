@@ -14,12 +14,10 @@ import {
 } from 'recharts';
 import {
   MessageCircle,
-  ExternalLink,
   Package,
   AlertCircle,
   Sparkles,
   Image,
-  Video,
   Eye,
   Heart,
   TrendingUp,
@@ -28,7 +26,9 @@ import {
   Loader2,
   RefreshCw,
   Users,
+  Play,
 } from 'lucide-react';
+import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramPostImageUrl } from '../../utils/imageProxy';
 import { InfoTooltip } from '../common/InfoTooltip';
 import { formatNumber, formatDateTime, formatPercent } from '../../utils/formatters';
 import {
@@ -84,81 +84,159 @@ interface CampaignListItem {
 
 // ApplicantListTab 컴포넌트를 재사용하여 참여 인플루언서 UI 구현
 
-// 콘텐츠 카드 컴포넌트 - Instagram CDN 만료로 썸네일 대신 카드 UI 사용
+// Instagram URL에서 shortCode 추출
+function extractShortCode(url: string | undefined): string | null {
+  if (!url) return null;
+  // https://www.instagram.com/p/ABC123/ → ABC123
+  // https://www.instagram.com/reel/ABC123/ → ABC123
+  const match = url.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+// Instagram 게시물 이미지 컴포넌트 (CDN 만료 대응)
+function InstagramPostImage({
+  originalUrl,
+  shortCode,
+  alt,
+  className = '',
+}: {
+  originalUrl: string | null | undefined;
+  shortCode: string | null | undefined;
+  alt: string;
+  className?: string;
+}) {
+  const [imageSrc, setImageSrc] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasFailed, setHasFailed] = useState(false);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      setIsLoading(true);
+      setHasFailed(false);
+
+      // 1. 원본 URL이 유효한 경우 시도
+      const proxiedUrl = getProxiedImageUrl(originalUrl);
+      if (proxiedUrl) {
+        setImageSrc(proxiedUrl);
+        return;
+      }
+
+      // 2. CDN 만료된 경우 → API로 새 URL 가져오기
+      if (shortCode && isInstagramCdnUrl(originalUrl)) {
+        try {
+          const apiUrl = getInstagramPostImageUrl(shortCode);
+          const response = await fetch(apiUrl);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.imageUrl) {
+              setImageSrc(data.imageUrl);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('게시물 이미지 로딩 실패:', shortCode, error);
+        }
+      }
+
+      // 3. 실패 시 fallback
+      setHasFailed(true);
+      setIsLoading(false);
+    };
+
+    loadImage();
+  }, [originalUrl, shortCode]);
+
+  const handleImageError = async () => {
+    // 이미지 로드 실패 시 API fallback 시도
+    if (!hasFailed && shortCode) {
+      try {
+        const apiUrl = getInstagramPostImageUrl(shortCode);
+        const response = await fetch(apiUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.imageUrl) {
+            setImageSrc(data.imageUrl);
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('게시물 이미지 fallback 실패:', shortCode, error);
+      }
+    }
+    setHasFailed(true);
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  if (hasFailed || !imageSrc) {
+    return (
+      <div className={`${className} bg-slate-200 flex items-center justify-center`}>
+        <span className="text-slate-400 text-xs">이미지 없음</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      {isLoading && (
+        <div className="w-full h-full bg-slate-200 animate-pulse absolute inset-0 rounded-lg" />
+      )}
+      <img
+        src={imageSrc}
+        alt={alt}
+        referrerPolicy="no-referrer"
+        className={`w-full h-full object-cover rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+      />
+    </div>
+  );
+}
+
+// 콘텐츠 카드 컴포넌트 - 이미지 그리드 형태 (인플루언서 모달 스타일)
 function ContentCard({ content }: { content: ContentItem }) {
   return (
     <a
       href={content.originalUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="group block rounded-xl overflow-hidden bg-white border border-slate-200 hover:border-primary-300 hover:shadow-md transition-all"
+      className="group relative aspect-square"
     >
-      {/* 상단: 콘텐츠 타입 & 인플루언서 정보 */}
-      <div className="p-3 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            content.type === 'video' ? 'bg-purple-100' : 'bg-pink-100'
-          }`}>
-            {content.type === 'video' ? (
-              <Video size={14} className="text-purple-600" />
-            ) : (
-              <Image size={14} className="text-pink-600" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-slate-800 truncate">{content.influencerName}</div>
-            <div className="text-xs text-slate-400">
-              {content.postedAt ? new Date(content.postedAt).toLocaleDateString('ko-KR') : 'Instagram'}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 썸네일 이미지 */}
+      <InstagramPostImage
+        originalUrl={content.thumbnail}
+        shortCode={extractShortCode(content.originalUrl)}
+        alt={content.influencerName}
+        className="w-full h-full object-cover rounded-lg"
+      />
 
-      {/* 중앙: 성과 지표 */}
-      <div className="p-4 bg-gradient-to-br from-slate-50 to-white">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-1 text-pink-500 mb-1">
-              <Heart size={14} />
-            </div>
-            <div className="text-lg font-bold text-slate-800">{formatNumber(content.likes)}</div>
-            <div className="text-xs text-slate-400">좋아요</div>
+      {/* 릴스/비디오인 경우 Play 아이콘 */}
+      {(content.type === 'reel' || content.type === 'video') && (
+        <div className="absolute top-2 right-2 bg-black/50 rounded-full p-1">
+          <Play size={12} fill="white" className="text-white" />
+        </div>
+      )}
+
+      {/* Hover 오버레이 */}
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+        <div className="text-white text-xs text-center space-y-1">
+          <div className="flex items-center justify-center gap-1">
+            <Heart size={12} fill="white" />
+            <span>{formatNumber(content.likes)}</span>
           </div>
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-1 text-blue-500 mb-1">
-              <MessageCircle size={14} />
-            </div>
-            <div className="text-lg font-bold text-slate-800">{formatNumber(content.comments)}</div>
-            <div className="text-xs text-slate-400">댓글</div>
+          <div className="flex items-center justify-center gap-1">
+            <MessageCircle size={12} fill="white" />
+            <span>{formatNumber(content.comments)}</span>
           </div>
-          {(content.views ?? 0) > 0 && (
-            <>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-purple-500 mb-1">
-                  <Eye size={14} />
-                </div>
-                <div className="text-lg font-bold text-slate-800">{formatNumber(content.views ?? 0)}</div>
-                <div className="text-xs text-slate-400">조회수</div>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-emerald-500 mb-1">
-                  <TrendingUp size={14} />
-                </div>
-                <div className="text-lg font-bold text-slate-800">
-                  {(content.views ?? 0) > 0 ? formatPercent((content.likes / (content.views ?? 1)) * 100) : '0%'}
-                </div>
-                <div className="text-xs text-slate-400">참여율</div>
-              </div>
-            </>
+          {content.postedAt && (
+            <div className="flex items-center justify-center gap-1">
+              <Calendar size={12} />
+              <span>{new Date(content.postedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
+            </div>
           )}
-        </div>
-      </div>
-
-      {/* 하단: Instagram 링크 */}
-      <div className="px-3 py-2 bg-slate-50 border-t border-slate-100">
-        <div className="flex items-center justify-center gap-1 text-xs text-slate-500 group-hover:text-primary-600 transition-colors">
-          <ExternalLink size={12} />
-          <span>Instagram에서 보기</span>
         </div>
       </div>
     </a>
@@ -166,18 +244,63 @@ function ContentCard({ content }: { content: ContentItem }) {
 }
 
 function ContentGallery({ contents }: { contents: ContentItem[] }) {
+  const [sortBy, setSortBy] = useState<'popular' | 'comments' | 'latest'>('popular');
+
+  // 정렬된 콘텐츠
+  const sortedContents = useMemo(() => {
+    const sorted = [...contents];
+    switch (sortBy) {
+      case 'popular':
+        return sorted.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+      case 'comments':
+        return sorted.sort((a, b) => (b.comments || 0) - (a.comments || 0));
+      case 'latest':
+        return sorted.sort((a, b) => new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime());
+      default:
+        return sorted;
+    }
+  }, [contents, sortBy]);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-primary-950">콘텐츠 갤러리</h3>
         <span className="text-sm text-slate-500">총 {contents.length}개</span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {contents.map((content) => (
+      {/* 정렬 탭 */}
+      <div className="flex border-b border-slate-200 mb-4">
+        {[
+          { key: 'popular', label: '인기순' },
+          { key: 'comments', label: '댓글순' },
+          { key: 'latest', label: '최신순' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setSortBy(tab.key as typeof sortBy)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              sortBy === tab.key
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 이미지 그리드 (4칼럼, 모바일 2칼럼) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {sortedContents.map((content) => (
           <ContentCard key={content.id} content={content} />
         ))}
       </div>
+
+      {/* 콘텐츠가 없는 경우 */}
+      {contents.length === 0 && (
+        <div className="text-center py-8 text-slate-400">등록된 콘텐츠가 없습니다</div>
+      )}
     </div>
   );
 }
