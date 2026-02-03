@@ -114,7 +114,10 @@ export function useProfileInsight(): ApiResponse<ProfileInsight> {
       // 서버 동기화 시간 추출 (가장 최근 collectedAt)
       if (insights.length > 0) {
         const latestSyncTime = insights
-          .map(item => new Date(item.collectedAt))
+          .map(item => {
+            const timeStr = item.collectedAt;
+            return new Date(timeStr.endsWith('Z') ? timeStr : timeStr + 'Z');
+          })
           .sort((a, b) => b.getTime() - a.getTime())[0];
         setServerSyncTime(latestSyncTime);
       }
@@ -287,7 +290,8 @@ export function useDailyAdData(period: string, userId?: string): ApiResponse<Dai
       const syncTimes: Date[] = [];
       accountsWithInsights.forEach(account => {
         if (account.dashAdAccount?.lastSyncedAt) {
-          syncTimes.push(new Date(account.dashAdAccount.lastSyncedAt));
+          const timeStr = account.dashAdAccount.lastSyncedAt;
+          syncTimes.push(new Date(timeStr.endsWith('Z') ? timeStr : timeStr + 'Z'));
         }
       });
       if (syncTimes.length > 0) {

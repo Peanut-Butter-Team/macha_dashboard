@@ -306,7 +306,7 @@ function Dashboard({ user, logout }: { user: NonNullable<ReturnType<typeof useAu
             <div className="flex items-center gap-3">
               {(activeTab === 'profile' ? serverProfileSyncTime : serverAdSyncTime) && (
                 <div className="text-sm text-slate-500">
-                  마지막 동기화: {(activeTab === 'profile' ? serverProfileSyncTime : serverAdSyncTime)?.toLocaleString('ko-KR')}
+                  마지막 동기화: {(activeTab === 'profile' ? serverProfileSyncTime : serverAdSyncTime)?.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                 </div>
               )}
               {(activeTab === 'profile' || activeTab === 'ads') && (
