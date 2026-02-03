@@ -26,6 +26,23 @@ const formatNumber = (num: number | null | undefined): string => {
   return formatNumberBase(num);
 };
 
+// 활동분야별 배지 색상 매핑
+const getActivityFieldColor = (field: string): string => {
+  const colorMap: Record<string, string> = {
+    '헬스': 'bg-red-100 text-red-800',
+    '러닝': 'bg-orange-100 text-orange-800',
+    '요가': 'bg-purple-100 text-purple-800',
+    '필라테스': 'bg-pink-100 text-pink-800',
+    '바레': 'bg-indigo-100 text-indigo-800',
+    '크로스핏': 'bg-blue-100 text-blue-800',
+    '하이록스': 'bg-cyan-100 text-cyan-800',
+    'F45': 'bg-green-100 text-green-800',
+    '헬스/웨이트': 'bg-yellow-100 text-yellow-800',
+    '기타': 'bg-gray-100 text-gray-800',
+  };
+  return colorMap[field] || 'bg-gray-100 text-gray-800';
+};
+
 // 신청자 + 캠페인 + 매칭 정보 결합 타입
 interface ApplicantWithCampaign extends ApplicantDto {
   campaignName: string;
@@ -98,6 +115,9 @@ function TableHeader({
       <tr>
         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-64">
           프로필
+        </th>
+        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-36">
+          활동분야
         </th>
         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
           캠페인
@@ -202,6 +222,23 @@ function TableRow({ item }: { item: ApplicantWithCampaign }) {
             )}
           </div>
         </div>
+      </td>
+
+      {/* 활동분야 */}
+      <td className="px-4 py-4 w-36">
+        {influencer?.activityField && influencer.activityField.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {influencer.activityField.flatMap((field, idx) =>
+              field.split(',').map((item, subIdx) => (
+                <span key={`${idx}-${subIdx}`} className={`px-2 py-0.5 text-xs rounded-full ${getActivityFieldColor(item.trim())}`}>
+                  {item.trim()}
+                </span>
+              ))
+            )}
+          </div>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )}
       </td>
 
       {/* 캠페인 */}
