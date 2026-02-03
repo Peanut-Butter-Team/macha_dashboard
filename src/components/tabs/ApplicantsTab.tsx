@@ -113,7 +113,7 @@ function TableHeader({
   return (
     <thead className="bg-slate-50 border-b border-slate-200">
       <tr>
-        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-64">
+        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-52">
           프로필
         </th>
         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-36">
@@ -277,15 +277,15 @@ function TableRow({ item }: { item: ApplicantWithCampaign }) {
               src={getProxiedImageUrl(post.displayUrl || post.images?.[0])}
               alt={`Post ${idx + 1}`}
               referrerPolicy="no-referrer"
-              className="w-12 h-12 object-cover rounded-lg bg-slate-200"
+              className="w-16 h-16 object-cover rounded-lg bg-slate-200"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="%23e2e8f0"><rect width="48" height="48"/></svg>';
+                target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="%23e2e8f0"><rect width="64" height="64"/></svg>';
               }}
             />
           ))}
           {latestPosts.length === 0 && (
-            <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 text-xs">
+            <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 text-xs">
               -
             </div>
           )}
