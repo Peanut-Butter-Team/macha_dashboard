@@ -212,7 +212,7 @@ function TableRow({
           <div className="flex flex-wrap gap-1">
             {influencer.activityField.flatMap((field, idx) =>
               field.split(',').map((item, subIdx) => (
-                <span key={`${idx}-${subIdx}`} className={`px-2 py-0.5 text-xs rounded-full ${getActivityFieldColor(item.trim())}`}>
+                <span key={`${idx}-${subIdx}`} className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap ${getActivityFieldColor(item.trim())}`}>
                   {item.trim()}
                 </span>
               ))
