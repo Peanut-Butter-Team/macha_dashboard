@@ -223,12 +223,14 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
   const [campaignStatusFilter, setCampaignStatusFilter] = useState<'active' | 'ended'>('active');  // 캠페인 상태 필터
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());  // 확장된 캠페인 ID
   const [expandedAdSets, setExpandedAdSets] = useState<Set<string>>(new Set());  // 확장된 광고세트 ID
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');  // 캠페인별 차트용 선택 캠페인
+  const [selectedDailyCampaignId, setSelectedDailyCampaignId] = useState<string>('all');  // 일별 성과 차트 캠페인 선택
   const ITEMS_PER_PAGE = 5;
 
-  // 캠페인별 차트 데이터 (데이터가 있는 캠페인만)
-  const campaignsWithData = campaignDailyData.filter(c => c.dailyData.length > 0);
-  const selectedCampaignData = campaignsWithData.find(c => c.campaignId === selectedCampaignId) || campaignsWithData[0];
+  // 일별 성과 차트용 데이터 (데이터가 있는 캠페인만)
+  const campaignsWithDailyData = campaignDailyData.filter(c => c.dailyData.length > 0);
+  const selectedDailyData = selectedDailyCampaignId === 'all'
+    ? (dailyData || [])
+    : (campaignsWithDailyData.find(c => c.campaignId === selectedDailyCampaignId)?.dailyData || []);
 
   // 캠페인 상태별 필터링 (실제 데이터 발생 여부 기준) + 생성일 기준 오름차순 정렬
   const filteredCampaignHierarchy = campaignHierarchy
@@ -834,19 +836,43 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
             <h3 className="text-lg font-semibold text-slate-900">일별 광고 성과</h3>
             <InfoTooltip metricKey="spend" />
           </div>
-          <div className="flex items-center gap-6 text-xs">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-violet-300" />
-              <span className="text-slate-600">지출</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-primary-500" />
-              <span className="text-slate-600">클릭</span>
+          <div className="flex items-center gap-4">
+            {/* 캠페인 선택 드롭다운 */}
+            <select
+              value={selectedDailyCampaignId}
+              onChange={(e) => setSelectedDailyCampaignId(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent max-w-[200px] truncate"
+            >
+              <option value="all">전체 캠페인</option>
+              {campaignsWithDailyData.map((campaign) => (
+                <option key={campaign.campaignId} value={campaign.campaignId}>
+                  {campaign.campaignName}
+                </option>
+              ))}
+            </select>
+            {/* 범례 */}
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-violet-300" />
+                <span className="text-slate-600">지출</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                <span className="text-slate-600">클릭</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span className="text-slate-600">ROAS</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                <span className="text-slate-600">CTR</span>
+              </div>
             </div>
           </div>
         </div>
         <div className="h-80 relative">
-          {!hasData && (
+          {(!hasData || (selectedDailyCampaignId !== 'all' && selectedDailyData.length === 0)) && (
             <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80 rounded-lg">
               <div className="text-center">
                 <p className="text-slate-400 text-sm">광고 데이터가 없습니다</p>
@@ -855,7 +881,7 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
             </div>
           )}
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={effectiveDailyData}>
+            <ComposedChart data={selectedDailyCampaignId === 'all' ? effectiveDailyData : selectedDailyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
               <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => '₩' + (v / 1000).toFixed(0) + 'K'} />
@@ -870,6 +896,9 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
                 }}
                 formatter={(value: number, name: string) => {
                   if (name === '지출') return [formatCurrency(value), name];
+                  if (name === 'ROAS') return [formatRoas(value), name];
+                  if (name === 'CTR') return [formatPercent(value, 2), name];
+                  if (name === 'CPC') return ['₩' + Math.round(value).toLocaleString(), name];
                   return [formatNumber(value), name];
                 }}
               />
@@ -879,9 +908,27 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
                 type="monotone"
                 dataKey="clicks"
                 stroke="#2563eb"
-                strokeWidth={3}
-                dot={{ fill: '#2563eb', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                strokeWidth={2}
+                dot={{ fill: '#2563eb', r: 3 }}
                 name="클릭"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="roas"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={{ fill: '#10b981', r: 3 }}
+                name="ROAS"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="ctr"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                dot={{ fill: '#f59e0b', r: 3 }}
+                name="CTR"
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -960,86 +1007,6 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
           </div>
         </section>
       </div>
-
-      {/* 캠페인별 일별 성과 */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-slate-900">캠페인별 일별 성과</h3>
-            <InfoTooltip metricKey="spend" />
-          </div>
-          {/* 캠페인 선택 드롭다운 */}
-          {campaignsWithData.length > 0 && (
-            <select
-              value={selectedCampaignId || selectedCampaignData?.campaignId || ''}
-              onChange={(e) => setSelectedCampaignId(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent max-w-xs truncate"
-            >
-              {campaignsWithData.map((campaign) => (
-                <option key={campaign.campaignId} value={campaign.campaignId}>
-                  {campaign.campaignName}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div className="h-80 relative">
-          {(!selectedCampaignData || selectedCampaignData.dailyData.length === 0) ? (
-            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80 rounded-lg">
-              <div className="text-center">
-                <p className="text-slate-400 text-sm">캠페인별 데이터가 없습니다</p>
-                <p className="text-slate-300 text-xs mt-1">광고 캠페인을 시작하면 데이터가 표시됩니다</p>
-              </div>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={selectedCampaignData.dailyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => '₩' + (v / 1000).toFixed(0) + 'K'} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#64748b' }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: 'none',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    padding: '12px',
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === '지출') return [formatCurrency(value), name];
-                    if (name === 'ROAS') return [formatRoas(value), name];
-                    return [formatNumber(value), name];
-                  }}
-                />
-                <Bar yAxisId="left" dataKey="spend" fill="#a78bfa" name="지출" radius={[4, 4, 0, 0]} />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="clicks"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  dot={{ fill: '#2563eb', r: 5, strokeWidth: 2, stroke: '#fff' }}
-                  name="클릭"
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-        {/* 범례 */}
-        {selectedCampaignData && selectedCampaignData.dailyData.length > 0 && (
-          <div className="flex items-center justify-center gap-6 mt-4 text-xs">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-violet-300" />
-              <span className="text-slate-600">지출</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-primary-500" />
-              <span className="text-slate-600">클릭</span>
-            </div>
-          </div>
-        )}
-      </section>
 
       {/* 유기적 vs 광고 성과 비교 */}
       <section>
