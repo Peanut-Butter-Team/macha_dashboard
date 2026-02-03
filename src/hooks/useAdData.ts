@@ -43,6 +43,7 @@ export function useAdData() {
     dailyAdData: store.dailyAdData,
     campaignPerformance: store.campaignPerformance,
     campaignHierarchy: store.campaignHierarchy,
+    campaignDailyData: store.campaignDailyData,
 
     // 상태
     loading: store.loading,

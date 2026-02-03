@@ -4,6 +4,7 @@ import type {
   DailyAdData,
   CampaignPerformance,
   CampaignHierarchy,
+  CampaignDailyData,
   PeriodType,
 } from '../types';
 import type {
@@ -18,6 +19,7 @@ import {
   mapToDailyAdDataFromCampaignDetail,
   mapToCampaignPerformanceFromCampaignDetail,
   mapToCampaignHierarchyFromCampaignDetail,
+  mapToCampaignDailyData,
   convertInsightsToCampaignDetail,
 } from '../utils/metaDashMapper';
 import {
@@ -43,6 +45,7 @@ interface AdState {
   dailyAdData: DailyAdData[] | null;
   campaignPerformance: CampaignPerformance[];
   campaignHierarchy: CampaignHierarchy[];
+  campaignDailyData: CampaignDailyData[];
 
   // 상태
   loading: boolean;
@@ -66,7 +69,7 @@ interface AdState {
 
 /**
  * 광고 데이터 통합 조회 함수
- * 단일 API 호출 후 어댑터로 변환하여 기존 매퍼와 호환
+ * 단일 API 호출 후 어댑터로 변환 (백엔드가 전체 기간 데이터를 반환)
  */
 async function fetchAllAdDataBatch(
   userId: string
@@ -74,7 +77,7 @@ async function fetchAllAdDataBatch(
   campaignList: DashAdListItem[];
   campaignDetails: DashAdCampaignDetailItem[];
 }> {
-  // 단일 API 호출
+  // 오늘 날짜로 API 호출 (백엔드가 전체 기간 데이터를 반환)
   const today = new Date().toISOString().split('T')[0];
   const accountsWithInsights = await fetchDashAdInsight(userId, today);
 
@@ -120,6 +123,7 @@ export const useAdStore = create<AdState>((set, get) => ({
   dailyAdData: null,
   campaignPerformance: [],
   campaignHierarchy: [],
+  campaignDailyData: [],
   loading: false,
   error: null,
   lastUpdated: null,
@@ -167,6 +171,7 @@ export const useAdStore = create<AdState>((set, get) => ({
         period,
         customDateRange || undefined
       );
+      const campaignDailyData = mapToCampaignDailyData(campaignDetails);
 
       set({
         rawCampaignList: campaignList,
@@ -175,6 +180,7 @@ export const useAdStore = create<AdState>((set, get) => ({
         dailyAdData,
         campaignPerformance,
         campaignHierarchy,
+        campaignDailyData,
         loading: false,
         error: null,
         lastUpdated: new Date(),
@@ -189,6 +195,7 @@ export const useAdStore = create<AdState>((set, get) => ({
         dailyAdData: DAILY_AD_DATA,
         campaignPerformance: CAMPAIGN_PERFORMANCE_DATA,
         campaignHierarchy: [],
+        campaignDailyData: [],
         loading: false,
         error: err instanceof Error ? err.message : '데이터를 불러올 수 없습니다',
         lastUpdated: new Date(),
@@ -229,6 +236,7 @@ export const useAdStore = create<AdState>((set, get) => ({
         period,
         customDateRange || undefined
       );
+      const campaignDailyData = mapToCampaignDailyData(campaignDetails);
 
       set({
         rawCampaignList: campaignList,
@@ -237,6 +245,7 @@ export const useAdStore = create<AdState>((set, get) => ({
         dailyAdData,
         campaignPerformance,
         campaignHierarchy,
+        campaignDailyData,
         loading: false,
         error: null,
         lastUpdated: new Date(),
@@ -293,6 +302,7 @@ export const useAdStore = create<AdState>((set, get) => ({
       dailyAdData: null,
       campaignPerformance: [],
       campaignHierarchy: [],
+      campaignDailyData: [],
       loading: false,
       error: null,
       lastUpdated: null,

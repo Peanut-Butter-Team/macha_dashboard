@@ -18,6 +18,7 @@ export function AdsPage() {
     dailyAdData,
     campaignPerformance,
     campaignHierarchy,
+    campaignDailyData,
     loading: adLoading,
     serverSyncTime,
     period,
@@ -98,6 +99,7 @@ export function AdsPage() {
         dailyData={dailyAdData}
         campaignData={campaignPerformance}
         campaignHierarchy={campaignHierarchy}
+        campaignDailyData={campaignDailyData}
         profileData={profileInsight}
         loading={adLoading}
         period={period}

@@ -64,6 +64,13 @@ export interface DailyAdData {
   cpc: number;
 }
 
+// 캠페인별 일별 데이터
+export interface CampaignDailyData {
+  campaignId: string;
+  campaignName: string;
+  dailyData: DailyAdData[];
+}
+
 // 캠페인별 성과 데이터 (UI용)
 export interface CampaignPerformance {
   id: string;

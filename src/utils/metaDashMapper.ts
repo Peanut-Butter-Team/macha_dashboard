@@ -20,6 +20,7 @@ import type {
   DailyAdData,
   CampaignPerformance,
   CampaignHierarchy,
+  CampaignDailyData,
   AdSetWithPerformance,
   AdWithPerformance,
 } from '../types';
@@ -783,8 +784,8 @@ export function mapToAdPerformanceFromCampaignDetail(
 // 기간 파라미터로 기간별 데이터 필터링 지원
 export function mapToDailyAdDataFromCampaignDetail(
   campaignDetails: DashAdCampaignDetailItem[],
-  period: PeriodType = 'daily',
-  customRange?: { start: string; end: string }
+  _period: PeriodType = 'daily',
+  _customRange?: { start: string; end: string }
 ): DailyAdData[] {
   // 1. 캠페인 중복 제거 (metaId 기준) - KPI 카드 함수와 동일
   const campaignMap = new Map<string, DashAdCampaignDetailItem>();
@@ -808,23 +809,22 @@ export function mapToDailyAdDataFromCampaignDetail(
     }
   }
 
-  // 2. 데이터에서 모든 날짜 추출하여 가장 최근 날짜 찾기
-  const allDates: string[] = [];
+  // 2. 데이터에서 모든 날짜 추출
+  const allDatesSet = new Set<string>();
   for (const detail of campaignMap.values()) {
     for (const adDetailObj of (detail.adDetailResponseObjs || [])) {
       for (const child of (adDetailObj.adSetChildObjs || [])) {
         const dateStr = child.dashAdAccountInsight?.time?.split('T')[0];
-        if (dateStr) allDates.push(dateStr);
+        if (dateStr) allDatesSet.add(dateStr);
       }
     }
   }
+  const allDates = Array.from(allDatesSet).sort();
 
-  // 가장 최근 데이터 날짜를 기준으로 사용 (동기화 지연 대응)
-  const latestDate = getLatestDateFromData(allDates);
-  const baseDate = latestDate ? new Date(latestDate + 'T12:00:00') : new Date();
-
-  // 기간별 날짜 범위 계산
-  const { startDate, endDate } = getDateRangeForPeriod(period, baseDate, customRange);
+  // 일별 차트는 기간 설정과 관계없이 전체 데이터 표시 (추이를 보여주기 위함)
+  // 데이터에 있는 가장 오래된 날짜와 가장 최근 날짜를 사용
+  const startDate = allDates.length > 0 ? allDates[0] : new Date().toISOString().split('T')[0];
+  const endDate = allDates.length > 0 ? allDates[allDates.length - 1] : new Date().toISOString().split('T')[0];
 
   // 3. 날짜별 합계 (중복 제거된 데이터 사용)
   const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number }>();
@@ -1294,6 +1294,116 @@ export function convertInsightsToCampaignDetail(
       });
     });
   });
+
+  return result;
+}
+
+// 13. 캠페인별 일별 데이터 변환
+// 각 캠페인의 일별 성과 추이를 보여주기 위한 함수
+export function mapToCampaignDailyData(
+  campaignDetails: DashAdCampaignDetailItem[]
+): CampaignDailyData[] {
+  // 1. 캠페인 중복 제거 (metaId 기준)
+  const campaignMap = new Map<string, DashAdCampaignDetailItem>();
+  for (const detail of campaignDetails) {
+    const campaignId = detail.dashAdCampaign.metaId;
+    const existing = campaignMap.get(campaignId);
+    if (!existing) {
+      campaignMap.set(campaignId, detail);
+    } else {
+      // 광고세트 병합
+      const mergedAdSets = [...(existing.adDetailResponseObjs || [])];
+      for (const newAdSet of (detail.adDetailResponseObjs || [])) {
+        const alreadyExists = mergedAdSets.some(
+          s => s.dashAdSet.metaAdSetId === newAdSet.dashAdSet.metaAdSetId
+        );
+        if (!alreadyExists) {
+          mergedAdSets.push(newAdSet);
+        }
+      }
+      campaignMap.set(campaignId, { ...detail, adDetailResponseObjs: mergedAdSets });
+    }
+  }
+
+  // 2. 각 캠페인별로 일별 데이터 추출
+  const result: CampaignDailyData[] = [];
+
+  for (const [campaignId, detail] of campaignMap.entries()) {
+    const campaign = detail.dashAdCampaign;
+    const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number }>();
+
+    // 광고세트 중복 제거 후 날짜별 합산
+    const adSetMap = new Map<string, typeof detail.adDetailResponseObjs[0]>();
+    for (const adDetailObj of (detail.adDetailResponseObjs || [])) {
+      const metaAdSetId = adDetailObj.dashAdSet.metaAdSetId;
+      const existing = adSetMap.get(metaAdSetId);
+      if (!existing) {
+        adSetMap.set(metaAdSetId, adDetailObj);
+      } else {
+        const mergedChildObjs = [...(existing.adSetChildObjs || [])];
+        for (const newChild of (adDetailObj.adSetChildObjs || [])) {
+          const alreadyExists = mergedChildObjs.some(
+            c => c.dashAdDetailEntity?.adId === newChild.dashAdDetailEntity?.adId
+          );
+          if (!alreadyExists) {
+            mergedChildObjs.push(newChild);
+          }
+        }
+        adSetMap.set(metaAdSetId, { ...adDetailObj, adSetChildObjs: mergedChildObjs });
+      }
+    }
+
+    // 소재 중복 제거 후 날짜별 합산
+    for (const adDetailObj of adSetMap.values()) {
+      const adMap = new Map<string, typeof adDetailObj.adSetChildObjs[0]>();
+      for (const child of (adDetailObj.adSetChildObjs || [])) {
+        const adId = child.dashAdDetailEntity?.adId;
+        const dateStr = child.dashAdAccountInsight?.time?.split('T')[0];
+        const key = `${adId}_${dateStr}`;
+        if (adId && dateStr && !adMap.has(key)) {
+          adMap.set(key, child);
+        }
+      }
+
+      for (const child of adMap.values()) {
+        const insight = child.dashAdAccountInsight;
+        if (!insight) continue;
+
+        const dateStr = insight.time.split('T')[0];
+        const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0 };
+        dateMap.set(dateStr, {
+          spend: existing.spend + insight.spend,
+          impressions: existing.impressions + insight.impressions,
+          clicks: existing.clicks + insight.clicks,
+          reach: existing.reach + insight.reach,
+          roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
+        });
+      }
+    }
+
+    // 일별 데이터 배열로 변환
+    const dailyData: DailyAdData[] = Array.from(dateMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dateStr, data]) => ({
+        date: formatDateToMMDD(dateStr + 'T00:00:00'),
+        spend: data.spend,
+        roas: data.spend > 0 ? data.roasWeighted / data.spend : 0,
+        clicks: data.clicks,
+        impressions: data.impressions,
+        conversions: 0,
+        ctr: calculateCtr(data.clicks, data.impressions),
+        cpc: calculateCpc(data.spend, data.clicks),
+      }));
+
+    // 데이터가 있는 캠페인만 추가
+    if (dailyData.length > 0) {
+      result.push({
+        campaignId,
+        campaignName: campaign.name,
+        dailyData,
+      });
+    }
+  }
 
   return result;
 }
