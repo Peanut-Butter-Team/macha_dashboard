@@ -1530,7 +1530,6 @@ function CampaignDetailView({
       <CampaignSummaryHeader
         campaign={campaign}
         applicantCount={applicantsRaw.length}
-        participantCount={participants.length}
       />
 
       {/* Sub Navigation */}

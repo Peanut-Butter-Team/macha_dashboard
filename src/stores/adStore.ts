@@ -103,8 +103,7 @@ function extractServerSyncTime(campaignDetails: DashAdCampaignDetailItem[]): Dat
     detail.adDetailResponseObjs?.forEach(adDetail => {
       adDetail.adSetChildObjs?.forEach(child => {
         if (child.dashAdAccountInsight?.lastSyncedAt) {
-          const timeStr = child.dashAdAccountInsight.lastSyncedAt;
-          syncTimes.push(new Date(timeStr.endsWith('Z') ? timeStr : timeStr + 'Z'));
+          syncTimes.push(new Date(child.dashAdAccountInsight.lastSyncedAt));
         }
       });
     });

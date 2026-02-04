@@ -126,14 +126,11 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         ),
       ]);
 
-      // 서버 동기화 시간 추출 (UTC 타임존 명시)
+      // 서버 동기화 시간 추출
       let serverSyncTime: Date | null = null;
       if (insights.length > 0) {
         serverSyncTime = insights
-          .map(item => {
-            const timeStr = item.collectedAt;
-            return new Date(timeStr.endsWith('Z') ? timeStr : timeStr + 'Z');
-          })
+          .map(item => new Date(item.collectedAt))
           .sort((a, b) => b.getTime() - a.getTime())[0];
       }
 
@@ -209,14 +206,11 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         ),
       ]);
 
-      // 서버 동기화 시간 추출 (UTC 타임존 명시)
+      // 서버 동기화 시간 추출
       let serverSyncTime: Date | null = null;
       if (insights.length > 0) {
         serverSyncTime = insights
-          .map(item => {
-            const timeStr = item.collectedAt;
-            return new Date(timeStr.endsWith('Z') ? timeStr : timeStr + 'Z');
-          })
+          .map(item => new Date(item.collectedAt))
           .sort((a, b) => b.getTime() - a.getTime())[0];
       }
 
