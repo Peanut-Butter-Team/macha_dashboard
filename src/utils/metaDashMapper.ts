@@ -40,9 +40,12 @@ function extractRoasValue(roasArray?: ActionValue[]): number {
 }
 
 // 1. 프로필 인사이트 변환
+// period 파라미터로 기간별 데이터 필터링 지원
 export function mapToProfileInsight(
   insights: DashMemberInsight[],
-  followers: DashFollower[]
+  followers: DashFollower[],
+  period: PeriodType = 'daily',
+  customRange?: { start: string; end: string }
 ): ProfileInsight {
   if (followers.length === 0) {
     throw new Error('팔로워 데이터가 없습니다');
@@ -60,11 +63,18 @@ export function mapToProfileInsight(
        previousFollower.followersCount) * 100
     : 0;
 
-  // 일별 인사이트에서 날짜 추출 (오늘/어제)
+  // 일별 인사이트에서 날짜 추출
   const dayInsights = insights.filter(i => i.period === 'day');
   const uniqueDates = [...new Set(dayInsights.map(i => i.time.split('T')[0]))].sort().reverse();
-  const todayDate = uniqueDates[0];
-  const yesterdayDate = uniqueDates[1];
+
+  // 기간별 날짜 범위 계산
+  const latestDate = uniqueDates[0];
+  const baseDate = latestDate ? new Date(latestDate + 'T12:00:00') : new Date();
+  const { endDate, prevEndDate } = getDateRangeForPeriod(period, baseDate, customRange);
+
+  // 현재 기간과 이전 기간의 날짜 설정 (기존 로직과의 호환성)
+  const todayDate = endDate;
+  const yesterdayDate = prevEndDate;
 
   // 오늘/어제 인사이트 필터링
   const todayInsights = dayInsights.filter(i => i.time.startsWith(todayDate));
@@ -116,14 +126,50 @@ export function mapToProfileInsight(
 }
 
 // 2. 일별 프로필 데이터 변환
+// period 파라미터로 기간별 데이터 집계 지원
 export function mapToDailyProfileData(
   followers: DashFollower[],
-  insights: DashMemberInsight[]
+  insights: DashMemberInsight[],
+  period: PeriodType = 'daily',
+  customRange?: { start: string; end: string }
 ): DailyProfileData[] {
   if (followers.length === 0) {
     return [];
   }
 
+  // 1. 먼저 모든 일별 데이터 생성
+  const dailyData = generateDailyProfileData(followers, insights);
+
+  // 2. 기간에 따라 집계
+  switch (period) {
+    case 'daily':
+      return dailyData;
+    case 'weekly':
+      return aggregateProfileByWeek(dailyData);
+    case 'monthly':
+      return aggregateProfileByMonth(dailyData);
+    case 'custom':
+      // 직접설정은 범위 내 일별 데이터 반환
+      if (customRange) {
+        return dailyData.filter(data => {
+          return data.originalDate >= customRange.start && data.originalDate <= customRange.end;
+        });
+      }
+      return dailyData;
+    default:
+      return dailyData;
+  }
+}
+
+// 일별 프로필 데이터 생성 (내부 함수)
+interface DailyProfileDataWithDate extends DailyProfileData {
+  originalDate: string; // YYYY-MM-DD 형식 원본 날짜
+}
+
+function generateDailyProfileData(
+  followers: DashFollower[],
+  insights: DashMemberInsight[]
+): DailyProfileDataWithDate[] {
   // 날짜별로 중복 제거 (Map 사용, 최신 데이터 유지)
   const dateMap = new Map<string, DashFollower>();
 
@@ -134,39 +180,126 @@ export function mapToDailyProfileData(
     if (!existing) {
       dateMap.set(dateStr, follower);
     } else {
-      // 같은 날짜면 더 최신 시간의 데이터로 업데이트
       if (new Date(follower.time) > new Date(existing.time)) {
         dateMap.set(dateStr, follower);
       }
     }
   }
 
-  // 날짜순 정렬 후 최근 14일만 추출
+  // 날짜순 정렬
   const uniqueFollowers = Array.from(dateMap.values())
-    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
-    .slice(-14);
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
   return uniqueFollowers.map(follower => {
     const dateStr = follower.time.split('T')[0];
 
-    // 해당 날짜의 일별 인사이트
     const dayInsights = insights.filter(
       i => i.period === 'day' && i.time.startsWith(dateStr)
     );
 
     const reach = findMetricValue(dayInsights, 'reach') || 0;
-    const impressions = findMetricValue(dayInsights, 'views') || 0;  // 노출 → views 값 사용
+    const impressions = findMetricValue(dayInsights, 'views') || 0;
     const interactions = findMetricValue(dayInsights, 'total_interactions') || 0;
     const engagement = reach > 0 ? (interactions / reach) * 100 : 0;
 
     return {
       date: formatDateToMMDD(follower.time),
+      originalDate: dateStr,
       followers: follower.followersCount,
       reach,
       impressions,
       engagement: parseFloat(engagement.toFixed(1)),
     };
   });
+}
+
+// 주간 집계 (ISO 주차 기준)
+function aggregateProfileByWeek(dailyData: DailyProfileDataWithDate[]): DailyProfileData[] {
+  if (dailyData.length === 0) return [];
+
+  // ISO 주차별로 그룹화
+  const weekMap = new Map<string, DailyProfileDataWithDate[]>();
+
+  for (const data of dailyData) {
+    const date = new Date(data.originalDate);
+    const weekKey = getISOWeekKey(date);
+    const existing = weekMap.get(weekKey) || [];
+    existing.push(data);
+    weekMap.set(weekKey, existing);
+  }
+
+  // 주차별로 집계
+  return Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, weekData]) => {
+      // 주의 시작일과 종료일 계산
+      const dates = weekData.map(d => d.originalDate).sort();
+      const startDate = new Date(dates[0]);
+      const endDate = new Date(dates[dates.length - 1]);
+      const dateLabel = `${startDate.getMonth() + 1}/${startDate.getDate()}~${endDate.getMonth() + 1}/${endDate.getDate()}`;
+
+      // 마지막 날 팔로워 수
+      const lastDay = weekData[weekData.length - 1];
+      // 합계
+      const totalReach = weekData.reduce((sum, d) => sum + d.reach, 0);
+      const totalImpressions = weekData.reduce((sum, d) => sum + d.impressions, 0);
+      // 평균 참여율
+      const avgEngagement = weekData.reduce((sum, d) => sum + d.engagement, 0) / weekData.length;
+
+      return {
+        date: dateLabel,
+        followers: lastDay.followers,
+        reach: totalReach,
+        impressions: totalImpressions,
+        engagement: parseFloat(avgEngagement.toFixed(1)),
+      };
+    });
+}
+
+// 월간 집계
+function aggregateProfileByMonth(dailyData: DailyProfileDataWithDate[]): DailyProfileData[] {
+  if (dailyData.length === 0) return [];
+
+  // 년-월별로 그룹화
+  const monthMap = new Map<string, DailyProfileDataWithDate[]>();
+
+  for (const data of dailyData) {
+    const monthKey = data.originalDate.substring(0, 7); // YYYY-MM
+    const existing = monthMap.get(monthKey) || [];
+    existing.push(data);
+    monthMap.set(monthKey, existing);
+  }
+
+  // 월별로 집계
+  return Array.from(monthMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([monthKey, monthData]) => {
+      // 마지막 날 팔로워 수
+      const lastDay = monthData[monthData.length - 1];
+      // 합계
+      const totalReach = monthData.reduce((sum, d) => sum + d.reach, 0);
+      const totalImpressions = monthData.reduce((sum, d) => sum + d.impressions, 0);
+      // 평균 참여율
+      const avgEngagement = monthData.reduce((sum, d) => sum + d.engagement, 0) / monthData.length;
+
+      return {
+        date: monthKey, // "2024-01" 형식
+        followers: lastDay.followers,
+        reach: totalReach,
+        impressions: totalImpressions,
+        engagement: parseFloat(avgEngagement.toFixed(1)),
+      };
+    });
+}
+
+// ISO 주차 키 생성 (YYYY-Wxx 형식)
+function getISOWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
 // 3. 콘텐츠 성과 변환
@@ -781,13 +914,45 @@ export function mapToAdPerformanceFromCampaignDetail(
 
 // 10. 캠페인 상세 응답에서 일별 광고 데이터 변환
 // KPI 카드 함수(mapToAdPerformanceFromCampaignDetail)와 동일한 3단계 중복 제거 적용
-// 기간 파라미터로 기간별 데이터 필터링 지원
+// 기간 파라미터로 기간별 데이터 집계 지원
 export function mapToDailyAdDataFromCampaignDetail(
   campaignDetails: DashAdCampaignDetailItem[],
-  _period: PeriodType = 'daily',
-  _customRange?: { start: string; end: string }
+  period: PeriodType = 'daily',
+  customRange?: { start: string; end: string }
 ): DailyAdData[] {
-  // 1. 캠페인 중복 제거 (metaId 기준) - KPI 카드 함수와 동일
+  // 1. 먼저 모든 일별 데이터 생성
+  const dailyData = generateDailyAdData(campaignDetails);
+
+  // 2. 기간에 따라 집계
+  switch (period) {
+    case 'daily':
+      return dailyData;
+    case 'weekly':
+      return aggregateAdByWeek(dailyData);
+    case 'monthly':
+      return aggregateAdByMonth(dailyData);
+    case 'custom':
+      // 직접설정은 범위 내 일별 데이터 반환
+      if (customRange) {
+        return dailyData.filter(data => {
+          return data.originalDate >= customRange.start && data.originalDate <= customRange.end;
+        });
+      }
+      return dailyData;
+    default:
+      return dailyData;
+  }
+}
+
+// 일별 광고 데이터 생성 (내부 함수)
+interface DailyAdDataWithDate extends DailyAdData {
+  originalDate: string; // YYYY-MM-DD 형식 원본 날짜
+}
+
+function generateDailyAdData(
+  campaignDetails: DashAdCampaignDetailItem[]
+): DailyAdDataWithDate[] {
+  // 1. 캠페인 중복 제거 (metaId 기준)
   const campaignMap = new Map<string, DashAdCampaignDetailItem>();
   for (const detail of campaignDetails) {
     const campaignId = detail.dashAdCampaign.metaId;
@@ -795,7 +960,6 @@ export function mapToDailyAdDataFromCampaignDetail(
     if (!existing) {
       campaignMap.set(campaignId, detail);
     } else {
-      // 광고세트 병합
       const mergedAdSets = [...(existing.adDetailResponseObjs || [])];
       for (const newAdSet of (detail.adDetailResponseObjs || [])) {
         const alreadyExists = mergedAdSets.some(
@@ -809,28 +973,10 @@ export function mapToDailyAdDataFromCampaignDetail(
     }
   }
 
-  // 2. 데이터에서 모든 날짜 추출
-  const allDatesSet = new Set<string>();
-  for (const detail of campaignMap.values()) {
-    for (const adDetailObj of (detail.adDetailResponseObjs || [])) {
-      for (const child of (adDetailObj.adSetChildObjs || [])) {
-        const dateStr = child.dashAdAccountInsight?.time?.split('T')[0];
-        if (dateStr) allDatesSet.add(dateStr);
-      }
-    }
-  }
-  const allDates = Array.from(allDatesSet).sort();
-
-  // 일별 차트는 기간 설정과 관계없이 전체 데이터 표시 (추이를 보여주기 위함)
-  // 데이터에 있는 가장 오래된 날짜와 가장 최근 날짜를 사용
-  const startDate = allDates.length > 0 ? allDates[0] : new Date().toISOString().split('T')[0];
-  const endDate = allDates.length > 0 ? allDates[allDates.length - 1] : new Date().toISOString().split('T')[0];
-
-  // 3. 날짜별 합계 (중복 제거된 데이터 사용)
+  // 2. 날짜별 합계 (중복 제거된 데이터 사용)
   const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number }>();
 
   for (const detail of campaignMap.values()) {
-    // 광고세트 중복 제거 (metaAdSetId 기준)
     const adSetMap = new Map<string, typeof detail.adDetailResponseObjs[0]>();
     for (const adDetailObj of (detail.adDetailResponseObjs || [])) {
       const metaAdSetId = adDetailObj.dashAdSet.metaAdSetId;
@@ -838,7 +984,6 @@ export function mapToDailyAdDataFromCampaignDetail(
       if (!existing) {
         adSetMap.set(metaAdSetId, adDetailObj);
       } else {
-        // 소재 병합
         const mergedChildObjs = [...(existing.adSetChildObjs || [])];
         for (const newChild of (adDetailObj.adSetChildObjs || [])) {
           const alreadyExists = mergedChildObjs.some(
@@ -852,9 +997,7 @@ export function mapToDailyAdDataFromCampaignDetail(
       }
     }
 
-    // 소재 중복 제거 후 날짜별 합산
     for (const adDetailObj of adSetMap.values()) {
-      // 소재 중복 제거 (adId + date 기준)
       const adMap = new Map<string, typeof adDetailObj.adSetChildObjs[0]>();
       for (const child of (adDetailObj.adSetChildObjs || [])) {
         const adId = child.dashAdDetailEntity?.adId;
@@ -865,16 +1008,11 @@ export function mapToDailyAdDataFromCampaignDetail(
         }
       }
 
-      // 중복 제거된 인사이트만 합산 (기간 필터 적용)
       for (const child of adMap.values()) {
         const insight = child.dashAdAccountInsight;
         if (!insight) continue;
 
         const dateStr = insight.time.split('T')[0];
-
-        // 기간 필터: 선택한 기간 범위 내 데이터만 포함
-        if (dateStr < startDate || dateStr > endDate) continue;
-
         const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0 };
         dateMap.set(dateStr, {
           spend: existing.spend + insight.spend,
@@ -891,11 +1029,12 @@ export function mapToDailyAdDataFromCampaignDetail(
     return [];
   }
 
-  // 4. 날짜순 정렬 후 변환
+  // 3. 날짜순 정렬 후 변환
   return Array.from(dateMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([dateStr, data]) => ({
       date: formatDateToMMDD(dateStr + 'T00:00:00'),
+      originalDate: dateStr,
       spend: data.spend,
       roas: data.spend > 0 ? data.roasWeighted / data.spend : 0,
       clicks: data.clicks,
@@ -904,6 +1043,86 @@ export function mapToDailyAdDataFromCampaignDetail(
       ctr: calculateCtr(data.clicks, data.impressions),
       cpc: calculateCpc(data.spend, data.clicks),
     }));
+}
+
+// 주간 집계 (ISO 주차 기준)
+function aggregateAdByWeek(dailyData: DailyAdDataWithDate[]): DailyAdData[] {
+  if (dailyData.length === 0) return [];
+
+  const weekMap = new Map<string, DailyAdDataWithDate[]>();
+
+  for (const data of dailyData) {
+    const date = new Date(data.originalDate);
+    const weekKey = getISOWeekKey(date);
+    const existing = weekMap.get(weekKey) || [];
+    existing.push(data);
+    weekMap.set(weekKey, existing);
+  }
+
+  return Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, weekData]) => {
+      const dates = weekData.map(d => d.originalDate).sort();
+      const startDate = new Date(dates[0]);
+      const endDate = new Date(dates[dates.length - 1]);
+      const dateLabel = `${startDate.getMonth() + 1}/${startDate.getDate()}~${endDate.getMonth() + 1}/${endDate.getDate()}`;
+
+      // 합계
+      const totalSpend = weekData.reduce((sum, d) => sum + d.spend, 0);
+      const totalClicks = weekData.reduce((sum, d) => sum + d.clicks, 0);
+      const totalImpressions = weekData.reduce((sum, d) => sum + d.impressions, 0);
+      // 가중평균 ROAS
+      const roasWeighted = weekData.reduce((sum, d) => sum + d.roas * d.spend, 0);
+      const avgRoas = totalSpend > 0 ? roasWeighted / totalSpend : 0;
+
+      return {
+        date: dateLabel,
+        spend: totalSpend,
+        roas: avgRoas,
+        clicks: totalClicks,
+        impressions: totalImpressions,
+        conversions: 0,
+        ctr: calculateCtr(totalClicks, totalImpressions),
+        cpc: calculateCpc(totalSpend, totalClicks),
+      };
+    });
+}
+
+// 월간 집계
+function aggregateAdByMonth(dailyData: DailyAdDataWithDate[]): DailyAdData[] {
+  if (dailyData.length === 0) return [];
+
+  const monthMap = new Map<string, DailyAdDataWithDate[]>();
+
+  for (const data of dailyData) {
+    const monthKey = data.originalDate.substring(0, 7); // YYYY-MM
+    const existing = monthMap.get(monthKey) || [];
+    existing.push(data);
+    monthMap.set(monthKey, existing);
+  }
+
+  return Array.from(monthMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([monthKey, monthData]) => {
+      // 합계
+      const totalSpend = monthData.reduce((sum, d) => sum + d.spend, 0);
+      const totalClicks = monthData.reduce((sum, d) => sum + d.clicks, 0);
+      const totalImpressions = monthData.reduce((sum, d) => sum + d.impressions, 0);
+      // 가중평균 ROAS
+      const roasWeighted = monthData.reduce((sum, d) => sum + d.roas * d.spend, 0);
+      const avgRoas = totalSpend > 0 ? roasWeighted / totalSpend : 0;
+
+      return {
+        date: monthKey, // "2024-01" 형식
+        spend: totalSpend,
+        roas: avgRoas,
+        clicks: totalClicks,
+        impressions: totalImpressions,
+        conversions: 0,
+        ctr: calculateCtr(totalClicks, totalImpressions),
+        cpc: calculateCpc(totalSpend, totalClicks),
+      };
+    });
 }
 
 // 11. 캠페인 상세 응답에서 캠페인 계층 구조 변환

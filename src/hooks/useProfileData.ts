@@ -43,7 +43,12 @@ export function useProfileData() {
     lastUpdated: store.lastUpdated,
     serverSyncTime: store.serverSyncTime,
 
+    // 기간 필터 상태
+    period: store.period,
+    customDateRange: store.customDateRange,
+
     // 액션
     refetch,
+    setPeriod: store.setPeriod,
   };
 }

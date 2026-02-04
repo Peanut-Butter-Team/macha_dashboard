@@ -4,6 +4,7 @@ import type {
   DailyProfileData,
   FollowerDemographic,
   ProfileContentItem,
+  PeriodType,
 } from '../types';
 import type {
   DashMemberInsight,
@@ -57,9 +58,14 @@ interface ProfileState {
   // 현재 로드된 사용자 ID
   currentUserId: string | null;
 
+  // 현재 선택된 기간
+  period: PeriodType;
+  customDateRange: { start: string; end: string } | null;
+
   // 액션
   fetchAllData: (userId: string) => Promise<void>;
   refresh: (userId: string) => Promise<void>;
+  setPeriod: (period: PeriodType, customRange?: { start: string; end: string }) => void;
   reset: () => void;
 }
 
@@ -78,6 +84,8 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   lastUpdated: null,
   serverSyncTime: null,
   currentUserId: null,
+  period: 'daily',
+  customDateRange: null,
 
   // 모든 프로필 데이터 가져오기 (캐싱 적용)
   fetchAllData: async (userId: string) => {
@@ -126,9 +134,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
           .sort((a, b) => b.getTime() - a.getTime())[0];
       }
 
-      // 데이터 변환
-      const profileInsight = mapToProfileInsight(insights, followers);
-      const dailyProfileData = mapToDailyProfileData(followers, insights);
+      // 현재 기간 설정 가져오기
+      const { period, customDateRange } = get();
+
+      // 데이터 변환 (기간 파라미터 적용)
+      const profileInsight = mapToProfileInsight(insights, followers, period, customDateRange || undefined);
+      const dailyProfileData = mapToDailyProfileData(followers, insights, period, customDateRange || undefined);
       const followerDemographic = mapToFollowerDemographic(followerInsights);
       const profileContent = mapToContentItems(medias);
 
@@ -203,9 +214,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
           .sort((a, b) => b.getTime() - a.getTime())[0];
       }
 
-      // 데이터 변환
-      const profileInsight = mapToProfileInsight(insights, followers);
-      const dailyProfileData = mapToDailyProfileData(followers, insights);
+      // 현재 기간 설정 가져오기
+      const { period, customDateRange } = get();
+
+      // 데이터 변환 (기간 파라미터 적용)
+      const profileInsight = mapToProfileInsight(insights, followers, period, customDateRange || undefined);
+      const dailyProfileData = mapToDailyProfileData(followers, insights, period, customDateRange || undefined);
       const followerDemographic = mapToFollowerDemographic(followerInsights);
       const profileContent = mapToContentItems(medias);
 
@@ -232,6 +246,25 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     }
   },
 
+  // 기간 변경 (API 재호출 없이 rawInsights/rawFollowers로 재계산)
+  setPeriod: (newPeriod: PeriodType, customRange?: { start: string; end: string }) => {
+    const { rawInsights, rawFollowers } = get();
+
+    // 기간 상태 업데이트
+    set({
+      period: newPeriod,
+      customDateRange: customRange || null,
+    });
+
+    // rawInsights/rawFollowers가 있으면 데이터 재계산
+    if (rawInsights && rawFollowers && rawInsights.length > 0 && rawFollowers.length > 0) {
+      const profileInsight = mapToProfileInsight(rawInsights, rawFollowers, newPeriod, customRange);
+      const dailyProfileData = mapToDailyProfileData(rawFollowers, rawInsights, newPeriod, customRange);
+
+      set({ profileInsight, dailyProfileData });
+    }
+  },
+
   // Store 리셋
   reset: () => {
     invalidateCache('profile');
@@ -249,6 +282,8 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       lastUpdated: null,
       serverSyncTime: null,
       currentUserId: null,
+      period: 'daily',
+      customDateRange: null,
     });
   },
 }));
