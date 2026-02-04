@@ -94,6 +94,7 @@ export function ProfilePage() {
         followerDemographic={followerDemographic}
         contentData={profileContent}
         loading={loading}
+        period={period}
       />
     </>
   );

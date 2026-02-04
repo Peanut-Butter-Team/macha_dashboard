@@ -14,7 +14,18 @@ import { TrendingUp, TrendingDown, Play, Image, Sparkles, ChevronLeft, ChevronRi
 import { InfoTooltip } from '../common/InfoTooltip';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
 import { formatNumber, formatPercent } from '../../utils/formatters';
-import type { ProfileInsight, DailyProfileData, FollowerDemographic, ProfileContentItem } from '../../types';
+import type { ProfileInsight, DailyProfileData, FollowerDemographic, ProfileContentItem, PeriodType } from '../../types';
+
+// 기간별 비교 텍스트 반환
+function getComparisonText(period: PeriodType): string {
+  switch (period) {
+    case 'daily': return '전일 대비';
+    case 'weekly': return '전주 대비';
+    case 'monthly': return '전월 대비';
+    case 'custom': return '이전 기간 대비';
+    default: return '전일 대비';
+  }
+}
 
 interface ProfileTabProps {
   profileData: ProfileInsight | null;
@@ -22,6 +33,7 @@ interface ProfileTabProps {
   followerDemographic: FollowerDemographic | null;
   contentData: ProfileContentItem[] | null;
   loading: boolean;
+  period?: PeriodType;
 }
 
 // 프로필 AI 분석 데이터
@@ -76,6 +88,7 @@ function ProfileKPICard({
   isPositive,
   metricKey,
   loading,
+  comparisonText = '전일 대비',
 }: {
   title: string;
   value: string;
@@ -83,6 +96,7 @@ function ProfileKPICard({
   isPositive: boolean;
   metricKey?: string;
   loading?: boolean;
+  comparisonText?: string;
 }) {
   if (loading) {
     return (
@@ -105,13 +119,14 @@ function ProfileKPICard({
       </div>
       <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
         {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-        <span>전일 대비 {change > 0 ? '+' : ''}{formatPercent(change)}</span>
+        <span>{comparisonText} {change > 0 ? '+' : ''}{formatPercent(change)}</span>
       </div>
     </div>
   );
 }
 
-export function ProfileTab({ profileData, dailyData, followerDemographic, contentData, loading }: ProfileTabProps) {
+export function ProfileTab({ profileData, dailyData, followerDemographic, contentData, loading, period = 'daily' }: ProfileTabProps) {
+  const comparisonText = getComparisonText(period);
   const [contentFilter, setContentFilter] = useState<'all' | ContentType>('all');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -168,6 +183,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
               isPositive={profileData.followersGrowth >= 0}
               metricKey="followers"
               loading={loading}
+              comparisonText={comparisonText}
             />
             <ProfileKPICard
               title="도달"
@@ -176,6 +192,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
               isPositive={profileData.reachGrowth >= 0}
               metricKey="reach"
               loading={loading}
+              comparisonText={comparisonText}
             />
             <ProfileKPICard
               title="참여율"
@@ -184,6 +201,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
               isPositive={profileData.engagementRateGrowth >= 0}
               metricKey="engagementRate"
               loading={loading}
+              comparisonText={comparisonText}
             />
             <ProfileKPICard
               title="노출"
@@ -192,6 +210,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
               isPositive={profileData.impressionsGrowth >= 0}
               metricKey="impressions"
               loading={loading}
+              comparisonText={comparisonText}
             />
           </section>
 
@@ -205,7 +224,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
           <div className="text-2xl font-bold text-slate-900">{profileActionsData.profileVisits.toLocaleString()}</div>
           <div className={`flex items-center gap-1 text-xs font-medium ${profileData.profileViewsGrowth >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
             {profileData.profileViewsGrowth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            <span>전일 대비 {profileData.profileViewsGrowth > 0 ? '+' : ''}{formatPercent(profileData.profileViewsGrowth)}</span>
+            <span>{comparisonText} {profileData.profileViewsGrowth > 0 ? '+' : ''}{formatPercent(profileData.profileViewsGrowth)}</span>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
@@ -216,7 +235,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
           <div className="text-2xl font-bold text-slate-900">{profileActionsData.websiteClicks.toLocaleString()}</div>
           <div className={`flex items-center gap-1 text-xs font-medium ${profileData.websiteClicksGrowth >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
             {profileData.websiteClicksGrowth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            <span>전일 대비 {profileData.websiteClicksGrowth > 0 ? '+' : ''}{formatPercent(profileData.websiteClicksGrowth)}</span>
+            <span>{comparisonText} {profileData.websiteClicksGrowth > 0 ? '+' : ''}{formatPercent(profileData.websiteClicksGrowth)}</span>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition-shadow h-[100px] flex flex-col justify-between">
@@ -229,7 +248,7 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
           </div>
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
             <TrendingUp size={12} />
-            <span>전일 대비 -</span>
+            <span>{comparisonText} -</span>
           </div>
         </div>
       </section>
