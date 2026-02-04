@@ -70,31 +70,40 @@ export function mapToProfileInsight(
   // 기간별 날짜 범위 계산
   const latestDate = uniqueDates[0];
   const baseDate = latestDate ? new Date(latestDate + 'T12:00:00') : new Date();
-  const { endDate, prevEndDate } = getDateRangeForPeriod(period, baseDate, customRange);
+  const { startDate, endDate, prevStartDate, prevEndDate } = getDateRangeForPeriod(period, baseDate, customRange);
 
-  // 현재 기간과 이전 기간의 날짜 설정 (기존 로직과의 호환성)
-  const todayDate = endDate;
-  const yesterdayDate = prevEndDate;
+  // 현재 기간 범위 내 인사이트 필터링 (startDate ~ endDate 전체)
+  const currentInsights = dayInsights.filter(i => {
+    const date = i.time.split('T')[0];
+    return date >= startDate && date <= endDate;
+  });
 
-  // 오늘/어제 인사이트 필터링
-  const todayInsights = dayInsights.filter(i => i.time.startsWith(todayDate));
-  const yesterdayInsights = yesterdayDate
-    ? dayInsights.filter(i => i.time.startsWith(yesterdayDate))
-    : [];
+  // 이전 기간 범위 내 인사이트 필터링 (prevStartDate ~ prevEndDate 전체)
+  const prevInsights = dayInsights.filter(i => {
+    const date = i.time.split('T')[0];
+    return date >= prevStartDate && date <= prevEndDate;
+  });
 
-  // 오늘 데이터
-  const reach = findMetricValue(todayInsights, 'reach') || 0;
-  const impressions = findMetricValue(todayInsights, 'views') || 0;
-  const profileViews = findMetricValue(todayInsights, 'profile_views') || 0;
-  const websiteClicks = findMetricValue(todayInsights, 'website_clicks') || 0;
-  const totalInteractions = findMetricValue(todayInsights, 'total_interactions') || 0;
+  // 지표별 합산 헬퍼 함수
+  const sumMetric = (insights: DashMemberInsight[], metricName: string): number => {
+    return insights
+      .filter(i => i.metricName === metricName)
+      .reduce((sum, i) => sum + (i.value || 0), 0);
+  };
 
-  // 어제 데이터
-  const yesterdayReach = findMetricValue(yesterdayInsights, 'reach') || 0;
-  const yesterdayImpressions = findMetricValue(yesterdayInsights, 'views') || 0;
-  const yesterdayProfileViews = findMetricValue(yesterdayInsights, 'profile_views') || 0;
-  const yesterdayWebsiteClicks = findMetricValue(yesterdayInsights, 'website_clicks') || 0;
-  const yesterdayTotalInteractions = findMetricValue(yesterdayInsights, 'total_interactions') || 0;
+  // 현재 기간 데이터 합산
+  const reach = sumMetric(currentInsights, 'reach');
+  const impressions = sumMetric(currentInsights, 'views');
+  const profileViews = sumMetric(currentInsights, 'profile_views');
+  const websiteClicks = sumMetric(currentInsights, 'website_clicks');
+  const totalInteractions = sumMetric(currentInsights, 'total_interactions');
+
+  // 이전 기간 데이터 합산
+  const yesterdayReach = sumMetric(prevInsights, 'reach');
+  const yesterdayImpressions = sumMetric(prevInsights, 'views');
+  const yesterdayProfileViews = sumMetric(prevInsights, 'profile_views');
+  const yesterdayWebsiteClicks = sumMetric(prevInsights, 'website_clicks');
+  const yesterdayTotalInteractions = sumMetric(prevInsights, 'total_interactions');
 
   // 참여율 계산
   const engagementRate = reach > 0 ? (totalInteractions / reach) * 100 : 0;
