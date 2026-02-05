@@ -39,6 +39,44 @@ function extractRoasValue(roasArray?: ActionValue[]): number {
   return roasArray[0]?.value || 0;
 }
 
+/**
+ * actions 배열에서 총 결과 수 추출
+ * 모든 action_type의 value를 합산
+ */
+function extractTotalResults(actions?: ActionValue[]): number {
+  if (!actions || actions.length === 0) return 0;
+  return actions.reduce((sum, action) => sum + (action.value || 0), 0);
+}
+
+/**
+ * costPerActionType에서 가중 평균 결과당 비용 추출
+ * actions와 매칭하여 (cost * count) / total_count 계산
+ */
+function extractCostPerResult(costPerActionType?: ActionValue[], actions?: ActionValue[]): number {
+  if (!costPerActionType || costPerActionType.length === 0) return 0;
+  if (!actions || actions.length === 0) return 0;
+
+  // action_type을 키로 하는 맵 생성 (결과 수 조회용)
+  const actionsMap = new Map<string, number>();
+  for (const action of actions) {
+    actionsMap.set(action.action_type, action.value || 0);
+  }
+
+  // 가중 평균 계산: Σ(cost × count) / Σ(count)
+  let totalWeightedCost = 0;
+  let totalCount = 0;
+
+  for (const costItem of costPerActionType) {
+    const count = actionsMap.get(costItem.action_type) || 0;
+    if (count > 0) {
+      totalWeightedCost += (costItem.value || 0) * count;
+      totalCount += count;
+    }
+  }
+
+  return totalCount > 0 ? totalWeightedCost / totalCount : 0;
+}
+
 // 1. 프로필 인사이트 변환
 // period 파라미터로 기간별 데이터 필터링 지원
 export function mapToProfileInsight(
@@ -463,6 +501,10 @@ export function mapToAdPerformance(
       clicksGrowth: 0,
       conversions: 0,
       frequency: 1,
+      results: 0,
+      resultsGrowth: 0,
+      costPerResult: 0,
+      costPerResultGrowth: 0,
     };
   }
 
@@ -495,6 +537,15 @@ export function mapToAdPerformance(
   const todayRoasWeighted = todayInsights.reduce((sum, i) => sum + extractRoasValue(i.purchaseRoas) * i.spend, 0);
   const roas = spend > 0 ? todayRoasWeighted / spend : 0;
 
+  // 오늘 결과 수 및 결과당 비용 계산
+  const results = todayInsights.reduce((sum, i) => sum + extractTotalResults(i.actions), 0);
+  const todayCostPerResultWeighted = todayInsights.reduce((sum, i) => {
+    const r = extractTotalResults(i.actions);
+    const cpr = extractCostPerResult(i.costPerActionType, i.actions);
+    return sum + cpr * r;
+  }, 0);
+  const costPerResult = results > 0 ? todayCostPerResultWeighted / results : 0;
+
   // 어제 합계
   const yesterdayInsights = dateMap.get(yesterdayDate) || [];
   const yesterdaySpend = yesterdayInsights.reduce((sum, i) => sum + i.spend, 0);
@@ -507,6 +558,15 @@ export function mapToAdPerformance(
   // 어제 ROAS 가중 평균 계산
   const yesterdayRoasWeighted = yesterdayInsights.reduce((sum, i) => sum + extractRoasValue(i.purchaseRoas) * i.spend, 0);
   const yesterdayRoas = yesterdaySpend > 0 ? yesterdayRoasWeighted / yesterdaySpend : 0;
+
+  // 어제 결과 수 및 결과당 비용 계산
+  const yesterdayResults = yesterdayInsights.reduce((sum, i) => sum + extractTotalResults(i.actions), 0);
+  const yesterdayCostPerResultWeighted = yesterdayInsights.reduce((sum, i) => {
+    const r = extractTotalResults(i.actions);
+    const cpr = extractCostPerResult(i.costPerActionType, i.actions);
+    return sum + cpr * r;
+  }, 0);
+  const yesterdayCostPerResult = yesterdayResults > 0 ? yesterdayCostPerResultWeighted / yesterdayResults : 0;
 
   return {
     spend,
@@ -524,6 +584,10 @@ export function mapToAdPerformance(
     clicksGrowth: calculateGrowth(clicks, yesterdayClicks),
     conversions: 0, // API에서 제공하지 않음
     frequency,
+    results,
+    resultsGrowth: calculateGrowth(results, yesterdayResults),
+    costPerResult,
+    costPerResultGrowth: calculateGrowth(costPerResult, yesterdayCostPerResult),
   };
 }
 
@@ -547,17 +611,22 @@ export function mapToDailyAdData(
     clicks: number;
     reach: number;
     roasWeighted: number;
+    results: number;
+    costPerResultWeighted: number;
   }>();
 
   for (const insight of allInsights) {
     const dateStr = insight.time.split('T')[0];
-    const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0 };
+    const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0, results: 0, costPerResultWeighted: 0 };
+    const r = extractTotalResults(insight.actions);
     dateMap.set(dateStr, {
       spend: existing.spend + insight.spend,
       impressions: existing.impressions + insight.impressions,
       clicks: existing.clicks + insight.clicks,
       reach: existing.reach + insight.reach,
       roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
+      results: existing.results + r,
+      costPerResultWeighted: existing.costPerResultWeighted + extractCostPerResult(insight.costPerActionType, insight.actions) * r,
     });
   }
 
@@ -574,6 +643,8 @@ export function mapToDailyAdData(
       conversions: 0, // API에서 제공하지 않음
       ctr: calculateCtr(data.clicks, data.impressions),
       cpc: calculateCpc(data.spend, data.clicks),
+      results: data.results,
+      costPerResult: data.results > 0 ? data.costPerResultWeighted / data.results : 0,
     }));
 }
 
@@ -652,6 +723,8 @@ export function mapToCampaignHierarchy(
     clicks: number;
     impressions: number;
     roasWeighted: number;
+    results: number;
+    costPerResultWeighted: number;
   }>();
 
   for (const ad of allAds) {
@@ -663,13 +736,18 @@ export function mapToCampaignHierarchy(
       clicks: 0,
       impressions: 0,
       roasWeighted: 0,
+      results: 0,
+      costPerResultWeighted: 0,
     };
+    const r = extractTotalResults(insight.actions);
     adSetPerformanceMap.set(adsetId, {
       spend: existing.spend + insight.spend,
       reach: existing.reach + insight.reach,
       clicks: existing.clicks + insight.clicks,
       impressions: existing.impressions + insight.impressions,
       roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
+      results: existing.results + r,
+      costPerResultWeighted: existing.costPerResultWeighted + extractCostPerResult(insight.costPerActionType, insight.actions) * r,
     });
   }
 
@@ -713,6 +791,8 @@ export function mapToCampaignHierarchy(
         clicks: 0,
         impressions: 0,
         roasWeighted: 0,
+        results: 0,
+        costPerResultWeighted: 0,
       };
 
       return {
@@ -732,6 +812,8 @@ export function mapToCampaignHierarchy(
         ctr: calculateCtr(perf.clicks, perf.impressions),
         cpc: calculateCpc(perf.spend, perf.clicks),
         roas: perf.spend > 0 ? perf.roasWeighted / perf.spend : 0,
+        results: perf.results,
+        costPerResult: perf.results > 0 ? perf.costPerResultWeighted / perf.results : 0,
         ads: [],  // 기존 API에서는 소재 데이터 없음
       };
     });
@@ -741,10 +823,14 @@ export function mapToCampaignHierarchy(
     const totalReach = adSetsWithPerformance.reduce((sum, s) => sum + s.reach, 0);
     const totalClicks = adSetsWithPerformance.reduce((sum, s) => sum + s.clicks, 0);
     const totalImpressions = adSetsWithPerformance.reduce((sum, s) => sum + s.impressions, 0);
+    const totalResults = adSetsWithPerformance.reduce((sum, s) => sum + s.results, 0);
 
     // 캠페인 ROAS 가중 평균 계산
     const totalRoasWeighted = adSetsWithPerformance.reduce((sum, s) => sum + s.roas * s.spend, 0);
     const campaignRoas = totalSpend > 0 ? totalRoasWeighted / totalSpend : 0;
+    // 캠페인 결과당 비용 가중 평균 계산
+    const totalCostPerResultWeighted = adSetsWithPerformance.reduce((sum, s) => sum + s.costPerResult * s.results, 0);
+    const campaignCostPerResult = totalResults > 0 ? totalCostPerResultWeighted / totalResults : 0;
 
     return {
       campaignId: campaign.campaignId,
@@ -760,6 +846,8 @@ export function mapToCampaignHierarchy(
       ctr: calculateCtr(totalClicks, totalImpressions),
       cpc: calculateCpc(totalSpend, totalClicks),
       roas: campaignRoas,
+      totalResults,
+      costPerResult: campaignCostPerResult,
       adSets: adSetsWithPerformance,
     };
   });
@@ -823,7 +911,9 @@ export function mapToAdPerformanceFromCampaignDetail(
 
   // 3. 중복 제거된 캠페인에서 인사이트 추출 (광고세트/소재 중복 제거 포함)
   let currentSpend = 0, currentReach = 0, currentClicks = 0, currentImpressions = 0, currentRoasWeighted = 0;
+  let currentResults = 0, currentCostPerResultWeighted = 0;
   let prevSpend = 0, prevReach = 0, prevClicks = 0, prevImpressions = 0, prevRoasWeighted = 0;
+  let prevResults = 0, prevCostPerResultWeighted = 0;
 
   for (const detail of campaignMap.values()) {
     const adDetailObjs = detail.adDetailResponseObjs || [];
@@ -879,6 +969,10 @@ export function mapToAdPerformanceFromCampaignDetail(
           currentClicks += insight.clicks || 0;
           currentImpressions += insight.impressions || 0;
           currentRoasWeighted += extractRoasValue(insight.purchaseRoas) * (insight.spend || 0);
+          // 결과 수 및 결과당 비용 합산
+          const r = extractTotalResults(insight.actions);
+          currentResults += r;
+          currentCostPerResultWeighted += extractCostPerResult(insight.costPerActionType, insight.actions) * r;
         }
         // 이전 기간 범위 내 데이터
         else if (insightDate >= prevStartDate && insightDate <= prevEndDate) {
@@ -887,6 +981,10 @@ export function mapToAdPerformanceFromCampaignDetail(
           prevClicks += insight.clicks || 0;
           prevImpressions += insight.impressions || 0;
           prevRoasWeighted += extractRoasValue(insight.purchaseRoas) * (insight.spend || 0);
+          // 결과 수 및 결과당 비용 합산
+          const r = extractTotalResults(insight.actions);
+          prevResults += r;
+          prevCostPerResultWeighted += extractCostPerResult(insight.costPerActionType, insight.actions) * r;
         }
       }
     }
@@ -897,10 +995,12 @@ export function mapToAdPerformanceFromCampaignDetail(
   const cpc = calculateCpc(currentSpend, currentClicks);
   const frequency = calculateFrequency(currentImpressions, currentReach);
   const roas = currentSpend > 0 ? currentRoasWeighted / currentSpend : 0;
+  const costPerResult = currentResults > 0 ? currentCostPerResultWeighted / currentResults : 0;
 
   const prevCtr = calculateCtr(prevClicks, prevImpressions);
   const prevCpc = calculateCpc(prevSpend, prevClicks);
   const prevRoas = prevSpend > 0 ? prevRoasWeighted / prevSpend : 0;
+  const prevCostPerResult = prevResults > 0 ? prevCostPerResultWeighted / prevResults : 0;
 
   return {
     spend: currentSpend,
@@ -918,6 +1018,10 @@ export function mapToAdPerformanceFromCampaignDetail(
     clicksGrowth: calculateGrowth(currentClicks, prevClicks),
     conversions: 0,
     frequency,
+    results: currentResults,
+    resultsGrowth: calculateGrowth(currentResults, prevResults),
+    costPerResult,
+    costPerResultGrowth: calculateGrowth(costPerResult, prevCostPerResult),
   };
 }
 
@@ -983,7 +1087,7 @@ function generateDailyAdData(
   }
 
   // 2. 날짜별 합계 (중복 제거된 데이터 사용)
-  const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number }>();
+  const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number; results: number; costPerResultWeighted: number }>();
 
   for (const detail of campaignMap.values()) {
     const adSetMap = new Map<string, typeof detail.adDetailResponseObjs[0]>();
@@ -1022,13 +1126,16 @@ function generateDailyAdData(
         if (!insight) continue;
 
         const dateStr = insight.time.split('T')[0];
-        const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0 };
+        const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0, results: 0, costPerResultWeighted: 0 };
+        const r = extractTotalResults(insight.actions);
         dateMap.set(dateStr, {
           spend: existing.spend + insight.spend,
           impressions: existing.impressions + insight.impressions,
           clicks: existing.clicks + insight.clicks,
           reach: existing.reach + insight.reach,
           roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
+          results: existing.results + r,
+          costPerResultWeighted: existing.costPerResultWeighted + extractCostPerResult(insight.costPerActionType, insight.actions) * r,
         });
       }
     }
@@ -1051,6 +1158,8 @@ function generateDailyAdData(
       conversions: 0,
       ctr: calculateCtr(data.clicks, data.impressions),
       cpc: calculateCpc(data.spend, data.clicks),
+      results: data.results,
+      costPerResult: data.results > 0 ? data.costPerResultWeighted / data.results : 0,
     }));
 }
 
@@ -1080,9 +1189,13 @@ function aggregateAdByWeek(dailyData: DailyAdDataWithDate[]): DailyAdData[] {
       const totalSpend = weekData.reduce((sum, d) => sum + d.spend, 0);
       const totalClicks = weekData.reduce((sum, d) => sum + d.clicks, 0);
       const totalImpressions = weekData.reduce((sum, d) => sum + d.impressions, 0);
+      const totalResults = weekData.reduce((sum, d) => sum + d.results, 0);
       // 가중평균 ROAS
       const roasWeighted = weekData.reduce((sum, d) => sum + d.roas * d.spend, 0);
       const avgRoas = totalSpend > 0 ? roasWeighted / totalSpend : 0;
+      // 가중평균 결과당 비용
+      const costPerResultWeighted = weekData.reduce((sum, d) => sum + d.costPerResult * d.results, 0);
+      const avgCostPerResult = totalResults > 0 ? costPerResultWeighted / totalResults : 0;
 
       return {
         date: dateLabel,
@@ -1093,6 +1206,8 @@ function aggregateAdByWeek(dailyData: DailyAdDataWithDate[]): DailyAdData[] {
         conversions: 0,
         ctr: calculateCtr(totalClicks, totalImpressions),
         cpc: calculateCpc(totalSpend, totalClicks),
+        results: totalResults,
+        costPerResult: avgCostPerResult,
       };
     });
 }
@@ -1117,9 +1232,13 @@ function aggregateAdByMonth(dailyData: DailyAdDataWithDate[]): DailyAdData[] {
       const totalSpend = monthData.reduce((sum, d) => sum + d.spend, 0);
       const totalClicks = monthData.reduce((sum, d) => sum + d.clicks, 0);
       const totalImpressions = monthData.reduce((sum, d) => sum + d.impressions, 0);
+      const totalResults = monthData.reduce((sum, d) => sum + d.results, 0);
       // 가중평균 ROAS
       const roasWeighted = monthData.reduce((sum, d) => sum + d.roas * d.spend, 0);
       const avgRoas = totalSpend > 0 ? roasWeighted / totalSpend : 0;
+      // 가중평균 결과당 비용
+      const costPerResultWeighted = monthData.reduce((sum, d) => sum + d.costPerResult * d.results, 0);
+      const avgCostPerResult = totalResults > 0 ? costPerResultWeighted / totalResults : 0;
 
       return {
         date: monthKey, // "2024-01" 형식
@@ -1130,6 +1249,8 @@ function aggregateAdByMonth(dailyData: DailyAdDataWithDate[]): DailyAdData[] {
         conversions: 0,
         ctr: calculateCtr(totalClicks, totalImpressions),
         cpc: calculateCpc(totalSpend, totalClicks),
+        results: totalResults,
+        costPerResult: avgCostPerResult,
       };
     });
 }
@@ -1266,6 +1387,13 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         // ROAS 가중 평균 계산
         const adRoasWeighted = insights.reduce((sum, i) => sum + extractRoasValue(i?.purchaseRoas) * (i?.spend || 0), 0);
         const adRoas = adSpend > 0 ? adRoasWeighted / adSpend : 0;
+        // 결과 수 및 결과당 비용 계산
+        const adResults = insights.reduce((sum, i) => sum + extractTotalResults(i?.actions), 0);
+        const adCostPerResultWeighted = insights.reduce((sum, i) => {
+          const r = extractTotalResults(i?.actions);
+          return sum + extractCostPerResult(i?.costPerActionType, i?.actions) * r;
+        }, 0);
+        const adCostPerResult = adResults > 0 ? adCostPerResultWeighted / adResults : 0;
 
         return {
           id: adDetail?.id || '',
@@ -1286,6 +1414,8 @@ export function mapToCampaignHierarchyFromCampaignDetail(
           ctr: calculateCtr(adClicks, adImpressions),
           cpc: calculateCpc(adSpend, adClicks),
           roas: adRoas,
+          results: adResults,
+          costPerResult: adCostPerResult,
         };
       });
 
@@ -1294,10 +1424,14 @@ export function mapToCampaignHierarchyFromCampaignDetail(
       const totalReach = ads.reduce((sum, ad) => sum + ad.reach, 0);
       const totalClicks = ads.reduce((sum, ad) => sum + ad.clicks, 0);
       const totalImpressions = ads.reduce((sum, ad) => sum + ad.impressions, 0);
+      const totalResults = ads.reduce((sum, ad) => sum + ad.results, 0);
 
       // 광고세트 ROAS 가중 평균 계산
       const totalRoasWeighted = ads.reduce((sum, ad) => sum + ad.roas * ad.spend, 0);
       const adSetRoas = totalSpend > 0 ? totalRoasWeighted / totalSpend : 0;
+      // 광고세트 결과당 비용 가중 평균 계산
+      const totalCostPerResultWeighted = ads.reduce((sum, ad) => sum + ad.costPerResult * ad.results, 0);
+      const adSetCostPerResult = totalResults > 0 ? totalCostPerResultWeighted / totalResults : 0;
 
       return {
         id: adSet.id,
@@ -1316,6 +1450,8 @@ export function mapToCampaignHierarchyFromCampaignDetail(
         ctr: calculateCtr(totalClicks, totalImpressions),
         cpc: calculateCpc(totalSpend, totalClicks),
         roas: adSetRoas,
+        results: totalResults,
+        costPerResult: adSetCostPerResult,
         ads,
       };
     });
@@ -1325,10 +1461,14 @@ export function mapToCampaignHierarchyFromCampaignDetail(
     const totalReach = adSetsWithPerformance.reduce((sum, s) => sum + s.reach, 0);
     const totalClicks = adSetsWithPerformance.reduce((sum, s) => sum + s.clicks, 0);
     const totalImpressions = adSetsWithPerformance.reduce((sum, s) => sum + s.impressions, 0);
+    const totalResults = adSetsWithPerformance.reduce((sum, s) => sum + s.results, 0);
 
     // 캠페인 ROAS 가중 평균 계산
     const campaignRoasWeighted = adSetsWithPerformance.reduce((sum, s) => sum + s.roas * s.spend, 0);
     const campaignRoas = totalSpend > 0 ? campaignRoasWeighted / totalSpend : 0;
+    // 캠페인 결과당 비용 가중 평균 계산
+    const campaignCostPerResultWeighted = adSetsWithPerformance.reduce((sum, s) => sum + s.costPerResult * s.results, 0);
+    const campaignCostPerResult = totalResults > 0 ? campaignCostPerResultWeighted / totalResults : 0;
 
     return {
       campaignId: campaign.id,
@@ -1344,6 +1484,8 @@ export function mapToCampaignHierarchyFromCampaignDetail(
       ctr: calculateCtr(totalClicks, totalImpressions),
       cpc: calculateCpc(totalSpend, totalClicks),
       roas: campaignRoas,
+      totalResults,
+      costPerResult: campaignCostPerResult,
       adSets: adSetsWithPerformance,
     };
   });
@@ -1558,7 +1700,7 @@ export function mapToCampaignDailyData(
 
   for (const [campaignId, detail] of campaignMap.entries()) {
     const campaign = detail.dashAdCampaign;
-    const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number }>();
+    const dateMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; roasWeighted: number; results: number; costPerResultWeighted: number }>();
 
     // 광고세트 중복 제거 후 날짜별 합산
     const adSetMap = new Map<string, typeof detail.adDetailResponseObjs[0]>();
@@ -1598,13 +1740,16 @@ export function mapToCampaignDailyData(
         if (!insight) continue;
 
         const dateStr = insight.time.split('T')[0];
-        const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0 };
+        const existing = dateMap.get(dateStr) || { spend: 0, impressions: 0, clicks: 0, reach: 0, roasWeighted: 0, results: 0, costPerResultWeighted: 0 };
+        const r = extractTotalResults(insight.actions);
         dateMap.set(dateStr, {
           spend: existing.spend + insight.spend,
           impressions: existing.impressions + insight.impressions,
           clicks: existing.clicks + insight.clicks,
           reach: existing.reach + insight.reach,
           roasWeighted: existing.roasWeighted + extractRoasValue(insight.purchaseRoas) * insight.spend,
+          results: existing.results + r,
+          costPerResultWeighted: existing.costPerResultWeighted + extractCostPerResult(insight.costPerActionType, insight.actions) * r,
         });
       }
     }
@@ -1621,6 +1766,8 @@ export function mapToCampaignDailyData(
         conversions: 0,
         ctr: calculateCtr(data.clicks, data.impressions),
         cpc: calculateCpc(data.spend, data.clicks),
+        results: data.results,
+        costPerResult: data.results > 0 ? data.costPerResultWeighted / data.results : 0,
       }));
 
     // 데이터가 있는 캠페인만 추가

@@ -51,6 +51,10 @@ export interface AdPerformance {
   clicksGrowth: number;
   conversions: number;
   frequency: number;
+  results: number;              // 총 결과 수
+  resultsGrowth: number;        // 결과 성장률
+  costPerResult: number;        // 결과당 비용
+  costPerResultGrowth: number;  // 결과당 비용 성장률
 }
 
 export interface DailyAdData {
@@ -62,6 +66,8 @@ export interface DailyAdData {
   conversions: number;
   ctr: number;
   cpc: number;
+  results: number;        // 결과 수
+  costPerResult: number;  // 결과당 비용
 }
 
 // 캠페인별 일별 데이터
@@ -234,6 +240,8 @@ export interface AdWithPerformance {
   ctr: number;
   cpc: number;
   roas: number;
+  results: number;        // 결과 수
+  costPerResult: number;  // 결과당 비용
 }
 
 // 광고세트 + 성과 (UI용)
@@ -255,6 +263,8 @@ export interface AdSetWithPerformance {
   ctr: number;
   cpc: number;
   roas: number;
+  results: number;        // 결과 수
+  costPerResult: number;  // 결과당 비용
   // 소재 목록
   ads: AdWithPerformance[];
 }
@@ -275,6 +285,8 @@ export interface CampaignHierarchy {
   ctr: number;
   cpc: number;
   roas: number;
+  totalResults: number;   // 총 결과 수
+  costPerResult: number;  // 결과당 비용
   // 광고세트 목록
   adSets: AdSetWithPerformance[];
 }

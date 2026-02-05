@@ -87,6 +87,10 @@ export const EMPTY_AD_PERFORMANCE: AdPerformance = {
   clicksGrowth: 0,
   conversions: 0,
   frequency: 0,
+  results: 0,
+  resultsGrowth: 0,
+  costPerResult: 0,
+  costPerResultGrowth: 0,
 };
 
 // 빈 일별 광고 데이터 생성 함수 (최근 14일 날짜만 표시)
@@ -108,6 +112,8 @@ export const generateEmptyDailyAdData = (): DailyAdData[] => {
       conversions: 0,
       ctr: 0,
       cpc: 0,
+      results: 0,
+      costPerResult: 0,
     });
   }
 
@@ -130,23 +136,27 @@ export const AD_PERFORMANCE: AdPerformance = {
   clicksGrowth: 10.7,
   conversions: 4850,
   frequency: 2.8,
+  results: 4850,
+  resultsGrowth: 12.5,
+  costPerResult: 6691,
+  costPerResultGrowth: -5.2,
 };
 
 export const DAILY_AD_DATA: DailyAdData[] = [
-  { date: '12/01', spend: 1850000, roas: 3.2, clicks: 8500, impressions: 285000, conversions: 245, ctr: 2.98, cpc: 218 },
-  { date: '12/02', spend: 2100000, roas: 3.5, clicks: 9800, impressions: 312000, conversions: 298, ctr: 3.14, cpc: 214 },
-  { date: '12/03', spend: 1950000, roas: 3.8, clicks: 9200, impressions: 298000, conversions: 312, ctr: 3.09, cpc: 212 },
-  { date: '12/04', spend: 2450000, roas: 4.1, clicks: 11500, impressions: 365000, conversions: 385, ctr: 3.15, cpc: 213 },
-  { date: '12/05', spend: 2200000, roas: 4.0, clicks: 10800, impressions: 342000, conversions: 362, ctr: 3.16, cpc: 204 },
-  { date: '12/06', spend: 2580000, roas: 4.3, clicks: 12200, impressions: 385000, conversions: 425, ctr: 3.17, cpc: 211 },
-  { date: '12/07', spend: 2850000, roas: 4.5, clicks: 13500, impressions: 425000, conversions: 485, ctr: 3.18, cpc: 211 },
-  { date: '12/08', spend: 2350000, roas: 4.2, clicks: 11200, impressions: 355000, conversions: 395, ctr: 3.15, cpc: 210 },
-  { date: '12/09', spend: 2150000, roas: 3.9, clicks: 10200, impressions: 325000, conversions: 348, ctr: 3.14, cpc: 211 },
-  { date: '12/10', spend: 2480000, roas: 4.4, clicks: 11800, impressions: 375000, conversions: 428, ctr: 3.15, cpc: 210 },
-  { date: '12/11', spend: 2720000, roas: 4.6, clicks: 12800, impressions: 405000, conversions: 468, ctr: 3.16, cpc: 213 },
-  { date: '12/12', spend: 2950000, roas: 4.8, clicks: 14200, impressions: 448000, conversions: 520, ctr: 3.17, cpc: 208 },
-  { date: '12/13', spend: 2420000, roas: 4.3, clicks: 11500, impressions: 365000, conversions: 412, ctr: 3.15, cpc: 210 },
-  { date: '12/14', spend: 2400000, roas: 4.2, clicks: 11200, impressions: 358000, conversions: 398, ctr: 3.13, cpc: 214 },
+  { date: '12/01', spend: 1850000, roas: 3.2, clicks: 8500, impressions: 285000, conversions: 245, ctr: 2.98, cpc: 218, results: 245, costPerResult: 7551 },
+  { date: '12/02', spend: 2100000, roas: 3.5, clicks: 9800, impressions: 312000, conversions: 298, ctr: 3.14, cpc: 214, results: 298, costPerResult: 7047 },
+  { date: '12/03', spend: 1950000, roas: 3.8, clicks: 9200, impressions: 298000, conversions: 312, ctr: 3.09, cpc: 212, results: 312, costPerResult: 6250 },
+  { date: '12/04', spend: 2450000, roas: 4.1, clicks: 11500, impressions: 365000, conversions: 385, ctr: 3.15, cpc: 213, results: 385, costPerResult: 6364 },
+  { date: '12/05', spend: 2200000, roas: 4.0, clicks: 10800, impressions: 342000, conversions: 362, ctr: 3.16, cpc: 204, results: 362, costPerResult: 6077 },
+  { date: '12/06', spend: 2580000, roas: 4.3, clicks: 12200, impressions: 385000, conversions: 425, ctr: 3.17, cpc: 211, results: 425, costPerResult: 6071 },
+  { date: '12/07', spend: 2850000, roas: 4.5, clicks: 13500, impressions: 425000, conversions: 485, ctr: 3.18, cpc: 211, results: 485, costPerResult: 5876 },
+  { date: '12/08', spend: 2350000, roas: 4.2, clicks: 11200, impressions: 355000, conversions: 395, ctr: 3.15, cpc: 210, results: 395, costPerResult: 5949 },
+  { date: '12/09', spend: 2150000, roas: 3.9, clicks: 10200, impressions: 325000, conversions: 348, ctr: 3.14, cpc: 211, results: 348, costPerResult: 6178 },
+  { date: '12/10', spend: 2480000, roas: 4.4, clicks: 11800, impressions: 375000, conversions: 428, ctr: 3.15, cpc: 210, results: 428, costPerResult: 5794 },
+  { date: '12/11', spend: 2720000, roas: 4.6, clicks: 12800, impressions: 405000, conversions: 468, ctr: 3.16, cpc: 213, results: 468, costPerResult: 5812 },
+  { date: '12/12', spend: 2950000, roas: 4.8, clicks: 14200, impressions: 448000, conversions: 520, ctr: 3.17, cpc: 208, results: 520, costPerResult: 5673 },
+  { date: '12/13', spend: 2420000, roas: 4.3, clicks: 11500, impressions: 365000, conversions: 412, ctr: 3.15, cpc: 210, results: 412, costPerResult: 5874 },
+  { date: '12/14', spend: 2400000, roas: 4.2, clicks: 11200, impressions: 358000, conversions: 398, ctr: 3.13, cpc: 214, results: 398, costPerResult: 6030 },
 ];
 
 // 캠페인별 성과 더미 데이터
@@ -611,5 +621,13 @@ export const METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
   engagementSource: {
     title: 'Engagement Source (참여 출처)',
     description: '참여가 발생한 출처 비율입니다. 광고와 유기적 참여의 비율을 확인할 수 있습니다.',
+  },
+  results: {
+    title: 'Results (결과)',
+    description: '광고 목표에 따른 전환 결과 수입니다. 구매, 장바구니 추가, 앱 설치 등 캠페인 목표 달성 횟수를 의미합니다.',
+  },
+  costPerResult: {
+    title: 'Cost Per Result (결과당 비용)',
+    description: '결과 1건당 소요된 비용입니다. 낮을수록 효율적인 광고 운영을 의미합니다.',
   },
 };

@@ -327,8 +327,8 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 메인 콘텐츠 영역 */}
         <div className="lg:col-span-2 space-y-6">
-          {/* KPI Cards - 3개씩 2열 */}
-          <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {/* KPI Cards - 4개씩 2열 */}
+          <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <AdKPICard
           title="총 광고 지출"
           value={formatCurrency(effectiveAdData.spend)}
@@ -345,6 +345,26 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
           change={effectiveAdData.roasGrowth}
           isPositive={effectiveAdData.roasGrowth >= 0}
           metricKey="roas"
+          loading={loading}
+          isEmpty={!hasData}
+          comparisonText={comparisonText}
+        />
+        <AdKPICard
+          title="총 결과"
+          value={formatNumber(effectiveAdData.results)}
+          change={effectiveAdData.resultsGrowth}
+          isPositive={effectiveAdData.resultsGrowth >= 0}
+          metricKey="results"
+          loading={loading}
+          isEmpty={!hasData}
+          comparisonText={comparisonText}
+        />
+        <AdKPICard
+          title="결과당 비용"
+          value={'₩' + Math.round(effectiveAdData.costPerResult).toLocaleString()}
+          change={effectiveAdData.costPerResultGrowth}
+          isPositive={effectiveAdData.costPerResultGrowth <= 0}
+          metricKey="costPerResult"
           loading={loading}
           isEmpty={!hasData}
           comparisonText={comparisonText}
@@ -479,28 +499,36 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
                         </div>
                       </div>
                       {/* 성과 지표 그리드 */}
-                      <div className="grid grid-cols-6 gap-3 ml-7">
-                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                      <div className="grid grid-cols-8 gap-2 ml-7">
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">지출</div>
                           <div className="font-semibold text-slate-800 text-sm">₩{campaign.totalSpend.toLocaleString()}</div>
                         </div>
-                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">ROAS</div>
                           <div className="font-semibold text-emerald-600 text-sm">{formatRoas(campaign.roas)}</div>
                         </div>
-                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
+                          <div className="text-xs text-slate-500 mb-0.5">결과</div>
+                          <div className="font-semibold text-violet-600 text-sm">{formatNumber(campaign.totalResults)}</div>
+                        </div>
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
+                          <div className="text-xs text-slate-500 mb-0.5">결과당 비용</div>
+                          <div className="font-semibold text-violet-600 text-sm">₩{Math.round(campaign.costPerResult).toLocaleString()}</div>
+                        </div>
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">도달</div>
                           <div className="font-semibold text-slate-800 text-sm">{formatNumber(campaign.totalReach)}</div>
                         </div>
-                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">클릭</div>
                           <div className="font-semibold text-slate-800 text-sm">{formatNumber(campaign.totalClicks)}</div>
                         </div>
-                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">CTR</div>
                           <div className="font-semibold text-slate-800 text-sm">{formatPercent(campaign.ctr, 2)}</div>
                         </div>
-                        <div className="bg-white rounded-lg px-3 py-2 text-center">
+                        <div className="bg-white rounded-lg px-2 py-2 text-center">
                           <div className="text-xs text-slate-500 mb-0.5">CPC</div>
                           <div className="font-semibold text-slate-800 text-sm">₩{Math.round(campaign.cpc).toLocaleString()}</div>
                         </div>
@@ -558,7 +586,7 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
                                 </div>
                               </div>
                               {/* 광고세트 성과 지표 */}
-                              <div className="grid grid-cols-6 gap-2 mt-3 ml-5">
+                              <div className="grid grid-cols-8 gap-2 mt-3 ml-5">
                                 <div className="text-center">
                                   <div className="text-xs text-slate-400">지출</div>
                                   <div className="text-sm text-slate-600">₩{adSet.spend.toLocaleString()}</div>
@@ -566,6 +594,14 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
                                 <div className="text-center">
                                   <div className="text-xs text-slate-400">ROAS</div>
                                   <div className="text-sm text-emerald-600 font-medium">{formatRoas(adSet.roas)}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">결과</div>
+                                  <div className="text-sm text-violet-600 font-medium">{formatNumber(adSet.results)}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-slate-400">결과당 비용</div>
+                                  <div className="text-sm text-violet-600 font-medium">₩{Math.round(adSet.costPerResult).toLocaleString()}</div>
                                 </div>
                                 <div className="text-center">
                                   <div className="text-xs text-slate-400">도달</div>
@@ -641,6 +677,8 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
                                         <div className="flex flex-wrap gap-4 text-xs">
                                           <span className="text-slate-500">지출 <span className="text-slate-700 font-medium">₩{ad.spend.toLocaleString()}</span></span>
                                           <span className="text-slate-500">ROAS <span className="text-emerald-600 font-medium">{formatRoas(ad.roas)}</span></span>
+                                          <span className="text-slate-500">결과 <span className="text-violet-600 font-medium">{formatNumber(ad.results)}</span></span>
+                                          <span className="text-slate-500">결과당 비용 <span className="text-violet-600 font-medium">₩{Math.round(ad.costPerResult).toLocaleString()}</span></span>
                                           <span className="text-slate-500">도달 <span className="text-slate-700 font-medium">{formatNumber(ad.reach)}</span></span>
                                           <span className="text-slate-500">클릭 <span className="text-slate-700 font-medium">{formatNumber(ad.clicks)}</span></span>
                                           <span className="text-slate-500">CTR <span className="text-slate-700 font-medium">{formatPercent(ad.ctr, 2)}</span></span>
