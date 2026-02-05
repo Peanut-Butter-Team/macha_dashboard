@@ -10,11 +10,12 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Play, Image, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Play, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { InfoTooltip } from '../common/InfoTooltip';
+import { AIAnalysisCard } from '../common/AIAnalysisCard';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
 import { formatNumber, formatPercent } from '../../utils/formatters';
-import type { ProfileInsight, DailyProfileData, FollowerDemographic, ProfileContentItem, PeriodType } from '../../types';
+import type { ProfileInsight, DailyProfileData, FollowerDemographic, ProfileContentItem, PeriodType, AIAnalysis } from '../../types';
 
 // 기간별 비교 텍스트 반환
 function getComparisonText(period: PeriodType): string {
@@ -36,24 +37,37 @@ interface ProfileTabProps {
   period?: PeriodType;
 }
 
-// 프로필 AI 분석 데이터
-const profileAIAnalysis = {
-  summary: '프로필 성장세가 전일 대비 18% 상승하며 꾸준한 팔로워 증가를 보이고 있습니다. 특히 릴스 콘텐츠의 도달률이 피드 대비 2.8배 높게 나타나고 있습니다.',
-  insights: [
-    '오후 6-9시 게시물의 참여율이 평균 대비 42% 높습니다.',
-    '릴스 콘텐츠가 피드 대비 2.8배 높은 도달률을 기록 중입니다.',
-    '스토리 링크 클릭률이 업계 평균(2.1%) 대비 1.5배 높습니다.',
-    '25-34세 여성 타겟층에서 가장 높은 참여율이 발생했습니다.',
-    '해시태그 #운동루틴 사용 시 노출이 35% 증가합니다.',
-  ],
-  recommendation: '릴스 콘텐츠 비중을 현재 40%에서 60%로 확대하고, 오후 6-9시에 집중 게시하는 것을 권장합니다. 스토리에 제품 링크를 더 적극적으로 활용하세요.',
-  generatedAt: '2024-12-14T15:30:00Z',
-};
-
 const profileActions = {
   profileVisits: 8934,
   websiteClicks: 2345,
 };
+
+// 프로필 AI 분석 API 호출 함수
+async function fetchProfileAIAnalysis(
+  profileData: ProfileInsight,
+  followerDemographic: FollowerDemographic | null,
+  recentContent: ProfileContentItem[] | null
+): Promise<AIAnalysis> {
+  const API_BASE = '';
+  const response = await fetch(`${API_BASE}/api/analyze`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'profile',
+      profileData,
+      followerDemographic,
+      recentContent: recentContent?.slice(0, 10),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('AI 분석 요청 실패');
+  }
+
+  return response.json();
+}
 
 // 콘텐츠 성과 더미 데이터
 type ContentType = 'reels' | 'feed' | 'carousel';
@@ -129,6 +143,27 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
   const comparisonText = getComparisonText(period);
   const [contentFilter, setContentFilter] = useState<'all' | ContentType>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // AI 분석 실행
+  const handleAnalyze = async () => {
+    if (!profileData) {
+      alert('프로필 데이터가 없습니다.');
+      return;
+    }
+
+    try {
+      setAiLoading(true);
+      const result = await fetchProfileAIAnalysis(profileData, followerDemographic, contentData);
+      setAiAnalysis(result);
+    } catch (err) {
+      console.error('[AI Analysis] 분석 실패:', err);
+      alert('AI 분석 중 오류가 발생했습니다.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // API 데이터가 없으면 더미 데이터 사용
   const contentList = contentData && contentData.length > 0 ? contentData : contentPerformanceData;
@@ -606,37 +641,16 @@ export function ProfileTab({ profileData, dailyData, followerDemographic, conten
 
         {/* 오른쪽 AI 분석 사이드바 */}
         <div className="lg:col-span-1">
-          <div className="bg-gradient-to-br from-primary-950 to-primary-900 rounded-2xl shadow-sm p-6 text-white sticky top-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-white/10 rounded-xl">
-                <Sparkles size={20} className="text-amber-400" />
-              </div>
-              <h3 className="text-lg font-semibold">AI 프로필 분석</h3>
-            </div>
-
-            <p className="text-primary-100 text-sm leading-relaxed mb-5 pb-5 border-b border-primary-800">
-              {profileAIAnalysis.summary}
-            </p>
-
-            <div className="space-y-3 mb-5">
-              {profileAIAnalysis.insights.map((insight, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <div className="w-5 h-5 rounded-full bg-primary-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-medium text-primary-300">{index + 1}</span>
-                  </div>
-                  <p className="text-sm text-primary-200 leading-relaxed">{insight}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-              <div className="text-xs font-semibold text-amber-400 mb-1">💡 추천 전략</div>
-              <p className="text-sm text-amber-100/90 leading-relaxed">{profileAIAnalysis.recommendation}</p>
-            </div>
-
-            <div className="mt-4 text-xs text-primary-400">
-              마지막 업데이트: {new Date(profileAIAnalysis.generatedAt).toLocaleString('ko-KR')}
-            </div>
+          <div className="sticky top-6">
+            <AIAnalysisCard
+              analysis={aiAnalysis}
+              onAnalyze={handleAnalyze}
+              loading={aiLoading}
+              title="AI 프로필 분석"
+              description="AI가 프로필 데이터를 분석하여
+성장 인사이트와 콘텐츠 전략을 제공합니다."
+              recommendationLabel="💡 추천 전략"
+            />
           </div>
         </div>
       </div>

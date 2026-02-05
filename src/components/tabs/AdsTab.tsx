@@ -17,16 +17,16 @@ import {
 import {
   TrendingUp,
   TrendingDown,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
 } from 'lucide-react';
 import { InfoTooltip } from '../common/InfoTooltip';
+import { AIAnalysisCard } from '../common/AIAnalysisCard';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
 import { formatNumber, formatCurrency, formatPercent, formatRoas } from '../../utils/formatters';
 import { EMPTY_AD_PERFORMANCE, generateEmptyDailyAdData } from '../../data/dummyData';
-import type { AdPerformance, DailyAdData, CampaignPerformance, ProfileInsight, CampaignHierarchy, CampaignDailyData, PeriodType } from '../../types';
+import type { AdPerformance, DailyAdData, CampaignPerformance, ProfileInsight, CampaignHierarchy, CampaignDailyData, PeriodType, AIAnalysis } from '../../types';
 
 interface AdsTabProps {
   adData: AdPerformance | null;
@@ -50,19 +50,32 @@ function getComparisonText(period: PeriodType): string {
   }
 }
 
-// 광고 AI 분석 데이터
-const adAIAnalysis = {
-  summary: '이번 캠페인은 전월 대비 ROAS가 23% 상승하며 우수한 성과를 기록하고 있습니다. 특히 리타게팅 캠페인의 전환율이 기대 이상입니다.',
-  insights: [
-    '리타게팅 캠페인이 ROAS 6.8x로 가장 높은 수익률을 기록 중입니다.',
-    '주말(토-일) 광고 효율이 평일 대비 35% 높게 나타났습니다.',
-    '25-34세 여성 타겟층에서 가장 높은 전환이 발생했습니다.',
-    'CPC가 전월 대비 12% 감소하여 비용 효율이 개선되었습니다.',
-    '브랜드 인지도 캠페인은 도달은 높으나 전환율 개선이 필요합니다.',
-  ],
-  recommendation: '리타게팅 캠페인 예산을 20% 증액하고, 브랜드 인지도 캠페인의 크리에이티브를 교체하는 것을 권장합니다. 주말 집중 노출 전략도 검토해 주세요.',
-  generatedAt: '2024-12-14T15:30:00Z',
-};
+// 광고 AI 분석 API 호출 함수
+async function fetchAdsAIAnalysis(
+  adData: AdPerformance,
+  topCampaigns: CampaignHierarchy[],
+  dailyData: DailyAdData[] | null
+): Promise<AIAnalysis> {
+  const API_BASE = '';
+  const response = await fetch(`${API_BASE}/api/analyze`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'ads',
+      adData,
+      topCampaigns: topCampaigns?.slice(0, 5),
+      dailyData: dailyData?.slice(-7),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('AI 분석 요청 실패');
+  }
+
+  return response.json();
+}
 
 // KPI 카드 컴포넌트 (로컬) - 컴팩트 버전
 function AdKPICard({
@@ -218,6 +231,28 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
   const comparisonText = getComparisonText(period);
   // 캠페인 테이블 페이지네이션 및 필터
   const [campaignPage, setCampaignPage] = useState(1);
+  // AI 분석 상태
+  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // AI 분석 실행
+  const handleAnalyze = async () => {
+    if (!adData) {
+      alert('광고 데이터가 없습니다.');
+      return;
+    }
+
+    try {
+      setAiLoading(true);
+      const result = await fetchAdsAIAnalysis(adData, campaignHierarchy, dailyData);
+      setAiAnalysis(result);
+    } catch (err) {
+      console.error('[AI Analysis] 분석 실패:', err);
+      alert('AI 분석 중 오류가 발생했습니다.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
   const [hierarchyPage, setHierarchyPage] = useState(1);  // 캠페인 계층 구조 페이지
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
   const [campaignStatusFilter, setCampaignStatusFilter] = useState<'active' | 'ended'>('active');  // 캠페인 상태 필터
@@ -1059,37 +1094,16 @@ export function AdsTab({ adData, dailyData, campaignData, campaignHierarchy, cam
 
       {/* AI 분석 사이드바 */}
       <div className="lg:col-span-1">
-        <div className="bg-gradient-to-br from-primary-950 to-primary-900 rounded-2xl shadow-sm p-6 text-white sticky top-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-white/10 rounded-xl">
-              <Sparkles size={20} className="text-amber-400" />
-            </div>
-            <h3 className="text-lg font-semibold">AI 광고 분석</h3>
-          </div>
-
-          <p className="text-primary-100 text-sm leading-relaxed mb-5 pb-5 border-b border-primary-800">
-            {adAIAnalysis.summary}
-          </p>
-
-          <div className="space-y-3 mb-5">
-            {adAIAnalysis.insights.map((insight, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <div className="w-5 h-5 rounded-full bg-primary-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-xs font-medium text-primary-300">{index + 1}</span>
-                </div>
-                <p className="text-sm text-primary-200 leading-relaxed">{insight}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-            <div className="text-xs font-semibold text-amber-400 mb-1">💡 추천 액션</div>
-            <p className="text-sm text-amber-100/90 leading-relaxed">{adAIAnalysis.recommendation}</p>
-          </div>
-
-          <div className="mt-4 text-xs text-primary-400">
-            마지막 업데이트: {new Date(adAIAnalysis.generatedAt).toLocaleString('ko-KR')}
-          </div>
+        <div className="sticky top-6">
+          <AIAnalysisCard
+            analysis={aiAnalysis}
+            onAnalyze={handleAnalyze}
+            loading={aiLoading}
+            title="AI 광고 분석"
+            description="AI가 광고 데이터를 분석하여
+성과 인사이트와 최적화 전략을 제공합니다."
+            recommendationLabel="💡 추천 액션"
+          />
         </div>
       </div>
     </div>
