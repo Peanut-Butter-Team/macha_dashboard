@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Search, Users, Instagram, Heart, MessageCircle, X, Eye, ExternalLink, ChevronUp, ChevronDown, Calendar, Play, RefreshCw } from 'lucide-react';
-import { fetchDashInfluencersWithDetail, updateDashInfluencer, fetchDashInfluencerDetail } from '../../services/metaDashApi';
+import { fetchDashInfluencersWithDetail, fetchAllDashInfluencersWithDetail, updateDashInfluencer, fetchDashInfluencerDetail } from '../../services/metaDashApi';
 import type { DashInfluencerWithDetail, DashInfluencerPost, DashInfluencer, DashInfluencerDetail } from '../../types/metaDash';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
 import { formatNumber as formatNumberBase, formatPercent } from '../../utils/formatters';
@@ -814,6 +814,9 @@ export function InfluencersTab() {
   const [serverTotalElements, setServerTotalElements] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(0);
 
+  // 필터 활성 시 전체 데이터 캐시 (클라이언트 정렬/페이징용)
+  const [allFilteredData, setAllFilteredData] = useState<DashInfluencerWithDetail[]>([]);
+
   // 임시 필터 상태 (UI에 바인딩)
   const [tempSearchQuery, setTempSearchQuery] = useState('');
   const [tempCategoryFilter, setTempCategoryFilter] = useState<string>('all');
@@ -880,6 +883,19 @@ export function InfluencersTab() {
       )
     );
 
+    // allFilteredData도 업데이트 (필터 모드일 때)
+    setAllFilteredData(prev =>
+      prev.map(item =>
+        item.dashInfluencer.id === updatedInfluencer.id
+          ? {
+              ...item,
+              dashInfluencer: updatedInfluencer,
+              dashInfluencerDetail: updatedDetail ?? item.dashInfluencerDetail
+            }
+          : item
+      )
+    );
+
     // 선택된 아이템도 업데이트
     setSelectedItem(prev =>
       prev && prev.dashInfluencer.id === updatedInfluencer.id
@@ -906,6 +922,7 @@ export function InfluencersTab() {
   const handleSearch = () => {
     // 데이터 초기화 및 로딩 상태로 전환
     setInfluencersWithDetail([]);
+    setAllFilteredData([]);
     setLoading(true);
 
     setAppliedFilters({
@@ -922,6 +939,7 @@ export function InfluencersTab() {
   const handleReset = () => {
     // 데이터 초기화 및 로딩 상태로 전환
     setInfluencersWithDetail([]);
+    setAllFilteredData([]);
     setLoading(true);
 
     setTempSearchQuery('');
@@ -972,29 +990,19 @@ export function InfluencersTab() {
     }
   };
 
+  // 서버 페이징 모드 (필터 비활성 시): 페이지별 15개씩 로드
   useEffect(() => {
+    if (hasActiveFilter) return;
+
     const loadInfluencers = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // 필터 파라미터 구성
-        const followerRange = getFollowerRange(appliedFilters.follower);
-        const activityWithin = getActivityDays(appliedFilters.activity);
-        const engagementMin = getEngagementMin(appliedFilters.engagement);
-
-        const params = {
+        const result = await fetchDashInfluencersWithDetail({
           page: currentPage + 1,
           size: PAGE_SIZE,
-          keyword: appliedFilters.search || undefined,
-          category: appliedFilters.category !== 'all' ? appliedFilters.category : undefined,
-          ...followerRange,
-          activityWithin,
-          engagementMin
-        };
-
-        // 서버 페이징 + 필터 사용
-        const result = await fetchDashInfluencersWithDetail(params);
+        });
         setInfluencersWithDetail(result.content);
         setServerTotalElements(result.totalElements);
         setServerTotalPages(result.totalPages);
@@ -1007,23 +1015,54 @@ export function InfluencersTab() {
     };
 
     loadInfluencers();
+  }, [currentPage, appliedFilters]);
+
+  // 클라이언트 모드 (필터 활성 시): 전체 데이터 한번에 로드
+  useEffect(() => {
+    if (!hasActiveFilter) return;
+
+    const loadAllFiltered = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const followerRange = getFollowerRange(appliedFilters.follower);
+        const activityWithin = getActivityDays(appliedFilters.activity);
+        const engagementMin = getEngagementMin(appliedFilters.engagement);
+
+        const allData = await fetchAllDashInfluencersWithDetail({
+          keyword: appliedFilters.search || undefined,
+          category: appliedFilters.category !== 'all' ? appliedFilters.category : undefined,
+          ...followerRange,
+          activityWithin,
+          engagementMin,
+        });
+        setAllFilteredData(allData);
+        setServerTotalElements(allData.length);
+        setServerTotalPages(Math.ceil(allData.length / PAGE_SIZE));
+      } catch (err) {
+        console.error('[InfluencersTab] 전체 데이터 로드 실패:', err);
+        setError(err instanceof Error ? err.message : '알 수 없는 오류');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllFiltered();
   }, [
-    currentPage,
     appliedFilters.search,
     appliedFilters.category,
     appliedFilters.follower,
     appliedFilters.engagement,
-    appliedFilters.activity
+    appliedFilters.activity,
   ]);
 
-  // 서버에서 필터링된 결과를 그대로 사용 (클라이언트 필터링 제거)
-  const filteredInfluencers = influencersWithDetail;
+  // 데이터 소스 결정: 필터 활성 시 전체 캐시, 아니면 서버 페이지 데이터
+  const dataSource = hasActiveFilter ? allFilteredData : influencersWithDetail;
 
-  // 정렬 (필터 모드일 때만 클라이언트 정렬 적용)
-  const sortedInfluencers = hasActiveFilter
-    ? [...filteredInfluencers].sort((a, b) => {
-        if (!sortField) return 0;
-
+  // 정렬 (sortField 있으면 항상 적용, dataSource 전체 대상)
+  const sortedData = sortField
+    ? [...dataSource].sort((a, b) => {
         const aDetail = a.dashInfluencerDetail;
         const bDetail = b.dashInfluencerDetail;
         const aPosts = aDetail?.latestPosts || [];
@@ -1071,12 +1110,20 @@ export function InfluencersTab() {
 
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
       })
-    : filteredInfluencers; // 서버 페이징 모드: 서버에서 받은 순서 그대로 사용
+    : dataSource;
 
-  // 페이지네이션 계산 - 항상 서버 페이지네이션 사용
-  const totalPages = serverTotalPages;
-  const totalElements = serverTotalElements;
-  const paginatedInfluencers = sortedInfluencers;
+  // 페이징 분기
+  const paginatedInfluencers = hasActiveFilter
+    ? sortedData.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+    : sortedData; // 서버 모드: 이미 서버에서 페이징됨
+
+  // totalPages/totalElements 분기
+  const totalPages = hasActiveFilter
+    ? Math.ceil(allFilteredData.length / PAGE_SIZE)
+    : serverTotalPages;
+  const totalElements = hasActiveFilter
+    ? allFilteredData.length
+    : serverTotalElements;
 
   // 카테고리 목록 추출
   const allCategories = Array.from(
@@ -1209,7 +1256,7 @@ export function InfluencersTab() {
 
       {/* 테이블 */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        {sortedInfluencers.length > 0 ? (
+        {paginatedInfluencers.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <TableHeader

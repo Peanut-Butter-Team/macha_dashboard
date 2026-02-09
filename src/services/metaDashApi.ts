@@ -272,6 +272,18 @@ export async function fetchDashInfluencersWithDetail(
   };
 }
 
+// 10-1. 인플루언서 전체 필터 결과 로드 (클라이언트 정렬/페이징용)
+export async function fetchAllDashInfluencersWithDetail(
+  params: Omit<FetchInfluencersParams, 'page' | 'size'> = {}
+): Promise<DashInfluencerWithDetail[]> {
+  const result = await fetchDashInfluencersWithDetail({
+    ...params,
+    page: 1,
+    size: 1000,
+  });
+  return result.content;
+}
+
 // 11. 광고 캠페인 목록 조회
 export async function fetchDashAdList(
   dashMemberId: string
