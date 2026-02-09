@@ -241,6 +241,13 @@ function ContentCard({ content }: { content: ContentItem }) {
       {/* Hover 오버레이 */}
       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
         <div className="text-white text-xs text-center space-y-1">
+          {/* 릴스/비디오인 경우 조회수 표시 */}
+          {(content.type === 'reel' || content.type === 'video') && (
+            <div className="flex items-center justify-center gap-1">
+              <Eye size={12} />
+              <span>{formatNumber(content.views)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-center gap-1">
             <Heart size={12} fill="white" />
             <span>{formatNumber(content.likes)}</span>
@@ -262,12 +269,17 @@ function ContentCard({ content }: { content: ContentItem }) {
 }
 
 function ContentGallery({ contents }: { contents: ContentItem[] }) {
-  const [sortBy, setSortBy] = useState<'popular' | 'comments' | 'latest'>('popular');
+  const [feedSortBy, setFeedSortBy] = useState<'popular' | 'comments' | 'latest'>('popular');
+  const [reelsSortBy, setReelsSortBy] = useState<'views' | 'popular' | 'latest'>('views');
 
-  // 정렬된 콘텐츠
-  const sortedContents = useMemo(() => {
-    const sorted = [...contents];
-    switch (sortBy) {
+  // 피드/릴스 분류
+  const feedContents = useMemo(() => contents.filter(c => c.type === 'image'), [contents]);
+  const reelsContents = useMemo(() => contents.filter(c => c.type === 'reel' || c.type === 'video'), [contents]);
+
+  // 피드 정렬
+  const sortedFeedContents = useMemo(() => {
+    const sorted = [...feedContents];
+    switch (feedSortBy) {
       case 'popular':
         return sorted.sort((a, b) => (b.likes || 0) - (a.likes || 0));
       case 'comments':
@@ -277,48 +289,132 @@ function ContentGallery({ contents }: { contents: ContentItem[] }) {
       default:
         return sorted;
     }
-  }, [contents, sortBy]);
+  }, [feedContents, feedSortBy]);
+
+  // 릴스 정렬
+  const sortedReelsContents = useMemo(() => {
+    const sorted = [...reelsContents];
+    switch (reelsSortBy) {
+      case 'views':
+        return sorted.sort((a, b) => (b.views || 0) - (a.views || 0));
+      case 'popular':
+        return sorted.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+      case 'latest':
+        return sorted.sort((a, b) => new Date(b.postedAt || 0).getTime() - new Date(a.postedAt || 0).getTime());
+      default:
+        return sorted;
+    }
+  }, [reelsContents, reelsSortBy]);
+
+  // 피드 평균 통계
+  const feedAvgLikes = feedContents.length > 0
+    ? Math.round(feedContents.reduce((s, c) => s + (c.likes || 0), 0) / feedContents.length)
+    : 0;
+  const feedAvgComments = feedContents.length > 0
+    ? Math.round(feedContents.reduce((s, c) => s + (c.comments || 0), 0) / feedContents.length)
+    : 0;
+
+  // 릴스 평균 통계
+  const reelsAvgViews = reelsContents.length > 0
+    ? Math.round(reelsContents.reduce((s, c) => s + (c.views || 0), 0) / reelsContents.length)
+    : 0;
+  const reelsAvgLikes = reelsContents.length > 0
+    ? Math.round(reelsContents.reduce((s, c) => s + (c.likes || 0), 0) / reelsContents.length)
+    : 0;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between px-6 pt-6 pb-2">
         <h3 className="text-lg font-semibold text-primary-950">콘텐츠 갤러리</h3>
         <span className="text-sm text-slate-500">총 {contents.length}개</span>
       </div>
 
-      {/* 정렬 탭 */}
-      <div className="flex border-b border-slate-200 mb-4">
-        {[
-          { key: 'popular', label: '인기순' },
-          { key: 'comments', label: '댓글순' },
-          { key: 'latest', label: '최신순' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setSortBy(tab.key as typeof sortBy)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              sortBy === tab.key
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* 피드 콘텐츠 섹션 */}
+      <div className="px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold text-slate-900">피드 콘텐츠</h4>
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <span>평균 좋아요 <strong>{formatNumber(feedAvgLikes)}</strong> 개</span>
+            <span>평균 댓글 <strong>{formatNumber(feedAvgComments)}</strong> 개</span>
+          </div>
+        </div>
+
+        {/* 피드 정렬 탭 */}
+        <div className="flex border-b border-slate-200 mb-3">
+          {[
+            { key: 'popular', label: '인기순' },
+            { key: 'comments', label: '댓글순' },
+            { key: 'latest', label: '최신순' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFeedSortBy(tab.key as typeof feedSortBy)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                feedSortBy === tab.key
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 피드 이미지 그리드 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {sortedFeedContents.map((content) => (
+            <ContentCard key={content.id} content={content} />
+          ))}
+        </div>
+
+        {feedContents.length === 0 && (
+          <div className="text-center py-8 text-slate-400">등록된 피드 콘텐츠가 없습니다</div>
+        )}
       </div>
 
-      {/* 이미지 그리드 (4칼럼, 모바일 2칼럼) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {sortedContents.map((content) => (
-          <ContentCard key={content.id} content={content} />
-        ))}
-      </div>
+      {/* 릴스 콘텐츠 섹션 */}
+      <div className="px-6 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold text-slate-900">릴스 콘텐츠</h4>
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <span>평균 조회수 <strong>{formatNumber(reelsAvgViews)}</strong> 회</span>
+            <span>평균 좋아요 <strong>{formatNumber(reelsAvgLikes)}</strong> 개</span>
+          </div>
+        </div>
 
-      {/* 콘텐츠가 없는 경우 */}
-      {contents.length === 0 && (
-        <div className="text-center py-8 text-slate-400">등록된 콘텐츠가 없습니다</div>
-      )}
+        {/* 릴스 정렬 탭 */}
+        <div className="flex border-b border-slate-200 mb-3">
+          {[
+            { key: 'views', label: '조회수순' },
+            { key: 'popular', label: '좋아요순' },
+            { key: 'latest', label: '최신순' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setReelsSortBy(tab.key as typeof reelsSortBy)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                reelsSortBy === tab.key
+                  ? 'border-violet-500 text-violet-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 릴스 이미지 그리드 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {sortedReelsContents.map((content) => (
+            <ContentCard key={content.id} content={content} />
+          ))}
+        </div>
+
+        {reelsContents.length === 0 && (
+          <div className="text-center py-8 text-slate-400">등록된 릴스 콘텐츠가 없습니다</div>
+        )}
+      </div>
     </div>
   );
 }
