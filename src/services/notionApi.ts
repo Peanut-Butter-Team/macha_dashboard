@@ -196,7 +196,7 @@ export async function createCampaign(dashMemberId: string, campaign: CreateCampa
   return data;
 }
 
-// 캠페인 결과 데이터 조회 (Instagram 포스트)
+// @deprecated fetchInfluencerResultList 사용 권장 (승인된 인플루언서 결과만 반환)
 export async function fetchCampaignResults(campaignId: string): Promise<CampaignResultDto[]> {
   const baseUrl = import.meta.env.VITE_CAMPAIGN_API_URL || 'https://matcha.pnutbutter.kr';
   const url = `${baseUrl}/api/v1/my-campaign-result/${campaignId}`;
@@ -214,6 +214,25 @@ export async function fetchCampaignResults(campaignId: string): Promise<Campaign
 
   const data: CampaignResultApiResponse = await response.json();
   console.log('[CampaignAPI] Campaign results:', data);
+  return data.result || [];
+}
+
+// 승인된 인플루언서의 캠페인 결과 데이터 조회
+export async function fetchInfluencerResultList(campaignId: string): Promise<CampaignResultDto[]> {
+  const baseUrl = import.meta.env.VITE_CAMPAIGN_API_URL || 'https://matcha.pnutbutter.kr';
+  const url = `${baseUrl}/api/v1/influencer-result-list/${campaignId}`;
+  console.log('[CampaignAPI] Fetching influencer result list:', url);
+
+  const response = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`인플루언서 결과 조회 실패: ${response.status}`);
+  }
+
+  const data: CampaignResultApiResponse = await response.json();
+  console.log('[CampaignAPI] Influencer result list:', data);
   return data.result || [];
 }
 

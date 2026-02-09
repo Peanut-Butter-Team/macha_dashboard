@@ -33,7 +33,7 @@ import { AIAnalysisCard } from '../common/AIAnalysisCard';
 import { formatNumber, formatDateTime, formatPercent } from '../../utils/formatters';
 import {
   fetchCampaignsWithDetail,
-  fetchCampaignResults,
+  fetchInfluencerResultList,
   syncCampaignData,
   convertCampaignWithDetailToNotionCampaign,
   type NotionCampaign,
@@ -1271,15 +1271,13 @@ function CampaignDetailView({
       setDetailLoading(true);
       console.log('[CampaignDetail] Loading detail data for campaign:', campaign.id);
 
-      // initialResults가 있으면 사용, 없으면 API 호출
+      // 항상 새 API로 승인된 인플루언서 결과만 조회, 실패 시 initialResults fallback
       let resultsData: CampaignResultDto[];
-      if (initialResults && initialResults.length > 0) {
-        console.log('[CampaignDetail] Using initial results from list API');
-        resultsData = initialResults;
-      } else {
-        console.log('[CampaignDetail] Fetching campaign results from API');
-        resultsData = await fetchCampaignResults(campaign.id).catch(() => []);
-      }
+      console.log('[CampaignDetail] Fetching influencer result list from API');
+      resultsData = await fetchInfluencerResultList(campaign.id).catch((err) => {
+        console.warn('[CampaignDetail] Influencer result list fetch failed, using initial results:', err);
+        return initialResults || [];
+      });
 
       console.log('[CampaignDetail] Campaign results:', resultsData);
 
