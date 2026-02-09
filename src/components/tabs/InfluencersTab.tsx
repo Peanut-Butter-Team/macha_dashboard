@@ -518,11 +518,10 @@ function InfluencerDetailModal({
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className={`p-2 border rounded-lg transition-colors ${
-                    refreshing
-                      ? 'border-slate-200 bg-slate-50 cursor-not-allowed'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
+                  className={`p-2 border rounded-lg transition-colors ${refreshing
+                    ? 'border-slate-200 bg-slate-50 cursor-not-allowed'
+                    : 'border-slate-200 hover:bg-slate-50'
+                    }`}
                   title="인플루언서 데이터 새로고침"
                 >
                   {refreshing ? (
@@ -648,11 +647,10 @@ function InfluencerDetailModal({
                 <button
                   key={tab.key}
                   onClick={() => setFeedSortBy(tab.key as typeof feedSortBy)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    feedSortBy === tab.key
-                      ? 'border-orange-500 text-orange-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${feedSortBy === tab.key
+                    ? 'border-orange-500 text-orange-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -730,11 +728,10 @@ function InfluencerDetailModal({
                 <button
                   key={tab.key}
                   onClick={() => setReelsSortBy(tab.key as typeof reelsSortBy)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    reelsSortBy === tab.key
-                      ? 'border-violet-500 text-violet-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${reelsSortBy === tab.key
+                    ? 'border-violet-500 text-violet-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -875,10 +872,10 @@ export function InfluencersTab() {
       prev.map(item =>
         item.dashInfluencer.id === updatedInfluencer.id
           ? {
-              ...item,
-              dashInfluencer: updatedInfluencer,
-              dashInfluencerDetail: updatedDetail ?? item.dashInfluencerDetail
-            }
+            ...item,
+            dashInfluencer: updatedInfluencer,
+            dashInfluencerDetail: updatedDetail ?? item.dashInfluencerDetail
+          }
           : item
       )
     );
@@ -888,10 +885,10 @@ export function InfluencersTab() {
       prev.map(item =>
         item.dashInfluencer.id === updatedInfluencer.id
           ? {
-              ...item,
-              dashInfluencer: updatedInfluencer,
-              dashInfluencerDetail: updatedDetail ?? item.dashInfluencerDetail
-            }
+            ...item,
+            dashInfluencer: updatedInfluencer,
+            dashInfluencerDetail: updatedDetail ?? item.dashInfluencerDetail
+          }
           : item
       )
     );
@@ -900,10 +897,10 @@ export function InfluencersTab() {
     setSelectedItem(prev =>
       prev && prev.dashInfluencer.id === updatedInfluencer.id
         ? {
-            ...prev,
-            dashInfluencer: updatedInfluencer,
-            dashInfluencerDetail: updatedDetail ?? prev.dashInfluencerDetail
-          }
+          ...prev,
+          dashInfluencer: updatedInfluencer,
+          dashInfluencerDetail: updatedDetail ?? prev.dashInfluencerDetail
+        }
         : prev
     );
   }, []);
@@ -1017,7 +1014,87 @@ export function InfluencersTab() {
     loadInfluencers();
   }, [currentPage, appliedFilters]);
 
-  // 클라이언트 모드 (필터 활성 시): 전체 데이터 한번에 로드
+  // ---------------------------------------------------------------------------
+  // [Client-Side Filter Helpers]
+  // API가 base followerCount(오래된 값) 기준으로 필터링하는 경우가 있어,
+  // 최신 detail 정보를 기준으로 클라이언트에서 2차 필터링 수행
+  // ---------------------------------------------------------------------------
+
+  const checkFollowerFilter = (item: DashInfluencerWithDetail, filter: string): boolean => {
+    if (filter === 'all') return true;
+    const detail = item.dashInfluencerDetail;
+    const base = item.dashInfluencer;
+    // UI와 동일한 우선순위: detail -> base -> 0
+    const count = detail?.followersCount ?? base.followerCount ?? 0;
+
+    switch (filter) {
+      case 'under1k': return count < 1000;
+      case '1k-10k': return count >= 1000 && count < 10000;
+      case '10k-50k': return count >= 10000 && count < 50000;
+      case '50k-100k': return count >= 50000 && count < 100000;
+      case 'over100k': return count >= 100000;
+      default: return true;
+    }
+  };
+
+  const checkEngagementFilter = (item: DashInfluencerWithDetail, filter: string): boolean => {
+    if (filter === 'all') return true;
+    const detail = item.dashInfluencerDetail;
+    const base = item.dashInfluencer;
+
+    // UI 로직 복사: (avgLikes + avgComments) / followerCount * 100
+    const allPosts = detail?.latestPosts || [];
+    const avgLikes = allPosts.length > 0
+      ? Math.round(allPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / allPosts.length)
+      : 0;
+    const avgComments = allPosts.length > 0
+      ? Math.round(allPosts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / allPosts.length)
+      : 0;
+
+    const followerCount = detail?.followersCount ?? base.followerCount ?? 0;
+    const engagementRate = followerCount > 0
+      ? ((avgLikes + avgComments) / followerCount) * 100
+      : 0;
+
+    switch (filter) {
+      case 'over1': return engagementRate >= 1;
+      case 'over3': return engagementRate >= 3;
+      case 'over5': return engagementRate >= 5;
+      case 'over10': return engagementRate >= 10;
+      default: return true;
+    }
+  };
+
+  const checkActivityFilter = (item: DashInfluencerWithDetail, filter: string): boolean => {
+    if (filter === 'all') return true;
+
+    // UI 로직: 가장 최근 게시물 날짜 비교
+    const allPosts = item.dashInfluencerDetail?.latestPosts || [];
+    const postsWithTimestamp = allPosts.filter(p => p.timestamp);
+    if (postsWithTimestamp.length === 0) return false; // 활동 기록 없으면 제외 (엄격 모드)
+
+    const latestPostDate = new Date(Math.max(...postsWithTimestamp.map(p => new Date(p.timestamp).getTime())));
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - latestPostDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    switch (filter) {
+      case 'week': return diffDays <= 7;
+      case 'month': return diffDays <= 30;
+      case '3months': return diffDays <= 90;
+      default: return true;
+    }
+  };
+
+
+  // 참여율 필터 적용 시 자동으로 참여율 순 정렬 (내림차순)
+  useEffect(() => {
+    if (appliedFilters.engagement !== 'all') {
+      setSortField('engagementRate');
+      setSortDirection('desc');
+    }
+  }, [appliedFilters.engagement]);
+
+  // 클라이언트 모드 (필터 활성 시): 전체 데이터 한번에 로드 후 클라이언트 필터링 적용
   useEffect(() => {
     if (!hasActiveFilter) return;
 
@@ -1030,13 +1107,28 @@ export function InfluencersTab() {
         const activityWithin = getActivityDays(appliedFilters.activity);
         const engagementMin = getEngagementMin(appliedFilters.engagement);
 
-        const allData = await fetchAllDashInfluencersWithDetail({
+        // 1. API 호출 (1차 필터링 - 서버 사이드)
+        // 주의: 서버는 'followerCount'(base) 기준으로 필터링할 수 있음 -> 오차 발생 가능
+        let allData = await fetchAllDashInfluencersWithDetail({
           keyword: appliedFilters.search || undefined,
           category: appliedFilters.category !== 'all' ? appliedFilters.category : undefined,
           ...followerRange,
           activityWithin,
           engagementMin,
         });
+
+        // 2. 클라이언트 필터링 (2차 필터링 - 보정)
+        // API가 반환한 데이터 중, 최신 detail 정보 기준으로 조건에 맞지 않는 항목 제거
+        if (appliedFilters.follower !== 'all') {
+          allData = allData.filter(item => checkFollowerFilter(item, appliedFilters.follower));
+        }
+        if (appliedFilters.engagement !== 'all') {
+          allData = allData.filter(item => checkEngagementFilter(item, appliedFilters.engagement));
+        }
+        if (appliedFilters.activity !== 'all') {
+          allData = allData.filter(item => checkActivityFilter(item, appliedFilters.activity));
+        }
+
         setAllFilteredData(allData);
         setServerTotalElements(allData.length);
         setServerTotalPages(Math.ceil(allData.length / PAGE_SIZE));
@@ -1063,53 +1155,53 @@ export function InfluencersTab() {
   // 정렬 (sortField 있으면 항상 적용, dataSource 전체 대상)
   const sortedData = sortField
     ? [...dataSource].sort((a, b) => {
-        const aDetail = a.dashInfluencerDetail;
-        const bDetail = b.dashInfluencerDetail;
-        const aPosts = aDetail?.latestPosts || [];
-        const bPosts = bDetail?.latestPosts || [];
+      const aDetail = a.dashInfluencerDetail;
+      const bDetail = b.dashInfluencerDetail;
+      const aPosts = aDetail?.latestPosts || [];
+      const bPosts = bDetail?.latestPosts || [];
 
-        let aVal = 0;
-        let bVal = 0;
+      let aVal = 0;
+      let bVal = 0;
 
-        switch (sortField) {
-          case 'followerCount':
-            aVal = aDetail?.followersCount || a.dashInfluencer.followerCount || 0;
-            bVal = bDetail?.followersCount || b.dashInfluencer.followerCount || 0;
-            break;
-          case 'postsCount':
-            aVal = aDetail?.postsCount || 0;
-            bVal = bDetail?.postsCount || 0;
-            break;
-          case 'avgLikes':
-            aVal = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / aPosts.length : 0;
-            bVal = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / bPosts.length : 0;
-            break;
-          case 'avgComments':
-            aVal = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / aPosts.length : 0;
-            bVal = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / bPosts.length : 0;
-            break;
-          case 'engagementRate': {
-            const aFollowers = aDetail?.followersCount || a.dashInfluencer.followerCount || 0;
-            const bFollowers = bDetail?.followersCount || b.dashInfluencer.followerCount || 0;
-            const aAvgLikes = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / aPosts.length : 0;
-            const bAvgLikes = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / bPosts.length : 0;
-            const aAvgComments = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / aPosts.length : 0;
-            const bAvgComments = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / bPosts.length : 0;
-            aVal = aFollowers > 0 ? ((aAvgLikes + aAvgComments) / aFollowers) * 100 : 0;
-            bVal = bFollowers > 0 ? ((bAvgLikes + bAvgComments) / bFollowers) * 100 : 0;
-            break;
-          }
-          case 'latestPost': {
-            const aLatest = aPosts.length > 0 ? Math.max(...aPosts.map(p => new Date(p.timestamp).getTime())) : 0;
-            const bLatest = bPosts.length > 0 ? Math.max(...bPosts.map(p => new Date(p.timestamp).getTime())) : 0;
-            aVal = aLatest;
-            bVal = bLatest;
-            break;
-          }
+      switch (sortField) {
+        case 'followerCount':
+          aVal = aDetail?.followersCount || a.dashInfluencer.followerCount || 0;
+          bVal = bDetail?.followersCount || b.dashInfluencer.followerCount || 0;
+          break;
+        case 'postsCount':
+          aVal = aDetail?.postsCount || 0;
+          bVal = bDetail?.postsCount || 0;
+          break;
+        case 'avgLikes':
+          aVal = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / aPosts.length : 0;
+          bVal = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / bPosts.length : 0;
+          break;
+        case 'avgComments':
+          aVal = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / aPosts.length : 0;
+          bVal = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / bPosts.length : 0;
+          break;
+        case 'engagementRate': {
+          const aFollowers = aDetail?.followersCount || a.dashInfluencer.followerCount || 0;
+          const bFollowers = bDetail?.followersCount || b.dashInfluencer.followerCount || 0;
+          const aAvgLikes = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / aPosts.length : 0;
+          const bAvgLikes = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.likesCount || 0), 0) / bPosts.length : 0;
+          const aAvgComments = aPosts.length > 0 ? aPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / aPosts.length : 0;
+          const bAvgComments = bPosts.length > 0 ? bPosts.reduce((s, p) => s + (p.commentsCount || 0), 0) / bPosts.length : 0;
+          aVal = aFollowers > 0 ? ((aAvgLikes + aAvgComments) / aFollowers) * 100 : 0;
+          bVal = bFollowers > 0 ? ((bAvgLikes + bAvgComments) / bFollowers) * 100 : 0;
+          break;
         }
+        case 'latestPost': {
+          const aLatest = aPosts.length > 0 ? Math.max(...aPosts.map(p => new Date(p.timestamp).getTime())) : 0;
+          const bLatest = bPosts.length > 0 ? Math.max(...bPosts.map(p => new Date(p.timestamp).getTime())) : 0;
+          aVal = aLatest;
+          bVal = bLatest;
+          break;
+        }
+      }
 
-        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-      })
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    })
     : dataSource;
 
   // 페이징 분기
@@ -1308,11 +1400,10 @@ export function InfluencersTab() {
                     {showEllipsis && <span className="text-slate-400">...</span>}
                     <button
                       onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                        currentPage === page
-                          ? 'bg-orange-500 text-white'
-                          : 'border border-slate-200 hover:bg-slate-50'
-                      }`}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${currentPage === page
+                        ? 'bg-orange-500 text-white'
+                        : 'border border-slate-200 hover:bg-slate-50'
+                        }`}
                     >
                       {page + 1}
                     </button>
