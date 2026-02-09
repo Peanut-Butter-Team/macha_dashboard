@@ -1291,11 +1291,7 @@ function CampaignDetailView({
 
       setNotionSeeding(seedingData);
       setCampaignResults(filteredResults);
-      // 성과 데이터가 모두 0/null인 항목 제외
-      const validResults = filteredResults.filter(r =>
-        (r.likesCount || 0) + (r.commentsCount || 0) + (r.videoPlayCount || 0) + (r.igPlayCount || 0) + (r.reshareCount || 0) > 0
-      );
-      setNotionContent(validResults.map(convertCampaignResultToContent));
+      setNotionContent(filteredResults.map(convertCampaignResultToContent));
     } catch (err) {
       console.error('[CampaignDetail] 상세 데이터 로드 실패:', err);
     } finally {

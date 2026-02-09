@@ -1,6 +1,8 @@
 // 캠페인 API 서비스
 // 서버에서 캠페인 데이터를 가져오는 API 클라이언트
 
+import type { DashInfluencer } from '../types/metaDash';
+
 // ============================================
 // 타입 정의
 // ============================================
@@ -84,6 +86,19 @@ export interface CampaignResultApiResponse {
   responseCode: number;
   message: string;
   result: CampaignResultDto[];
+}
+
+// influencer-result-list API 응답의 각 아이템 타입
+export interface InfluencerResultItem {
+  dashInfluencer: DashInfluencer;
+  dashCampaignResult: CampaignResultDto[] | null;
+}
+
+export interface InfluencerResultApiResponse {
+  responseName: string;
+  responseCode: number;
+  message: string;
+  result: InfluencerResultItem[];
 }
 
 // 캠페인 생성 요청 타입
@@ -231,9 +246,10 @@ export async function fetchInfluencerResultList(campaignId: string): Promise<Cam
     throw new Error(`인플루언서 결과 조회 실패: ${response.status}`);
   }
 
-  const data: CampaignResultApiResponse = await response.json();
+  const data: InfluencerResultApiResponse = await response.json();
   console.log('[CampaignAPI] Influencer result list:', data);
-  return data.result || [];
+  // dashCampaignResult가 null이 아닌 아이템의 결과만 추출하여 플랫하게 반환
+  return (data.result || []).flatMap(item => item.dashCampaignResult || []);
 }
 
 // 캠페인 데이터 동기화 (Apify)
