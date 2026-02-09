@@ -10,7 +10,8 @@
  * @param num - 포맷팅할 숫자
  * @returns 천단위 콤마가 적용된 문자열 (예: 1,234,567)
  */
-export const formatNumber = (num: number): string => {
+export const formatNumber = (num: number | null | undefined): string => {
+  if (num == null) return '0';
   return num.toLocaleString();
 };
 
@@ -19,7 +20,8 @@ export const formatNumber = (num: number): string => {
  * @param num - 포맷팅할 금액
  * @returns 원화 기호와 천단위 콤마가 적용된 문자열 (예: ₩1,234,567)
  */
-export const formatCurrency = (num: number): string => {
+export const formatCurrency = (num: number | null | undefined): string => {
+  if (num == null) return '₩0';
   return '₩' + num.toLocaleString();
 };
 
