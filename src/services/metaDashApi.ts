@@ -20,7 +20,7 @@ import type {
 const BASE_URL = 'https://matcha.pnutbutter.kr';
 
 // 공통 fetch 래퍼 (30초 타임아웃 + 재시도 로직 포함)
-async function fetchMetaDash<T>(
+export async function fetchMetaDash<T>(
   endpoint: string,
   options?: RequestInit,
   timeoutMs: number = 30000,

@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Users,
   Play,
+  Plus,
 } from 'lucide-react';
 import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramPostImageUrl } from '../../utils/imageProxy';
 import { InfoTooltip } from '../common/InfoTooltip';
@@ -53,6 +54,7 @@ import type {
 import { CampaignSummaryHeader } from '../campaign/CampaignSummaryHeader';
 import { ApplicantListTab } from '../campaign/ApplicantListTab';
 import { fetchApplicants, type ApplicantDto } from '../../services/notionApi';
+import { usePollScrapeJob } from '../../hooks/usePollScrapeJob';
 
 interface CampaignTabProps {
   influencers: Influencer[] | null;
@@ -80,6 +82,7 @@ interface CampaignListItem {
   endDate: string;
   manager: string;
   status: string; // Notion에서 '진행중', '완료' 등 한국어 상태값이 올 수 있음
+  mentionName: string;
 }
 
 // ApplicantListTab 컴포넌트를 재사용하여 참여 인플루언서 UI 구현
@@ -1196,6 +1199,8 @@ function CampaignDetailView({
   const [influencerLoading, setInfluencerLoading] = useState(true);
   const [applicantError, setApplicantError] = useState<string | null>(null);
 
+  const [createCampaignDataLoading, setCreateCampaignDataLoading] = useState(false);
+
   // 신청자 관리 활성화 계정인지 확인 (로그인 아이디로 체크)
   const isApplicantEnabledAccount = user?.loginId && APPLICANT_ENABLED_ACCOUNTS.includes(user.loginId);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
@@ -1394,7 +1399,30 @@ function CampaignDetailView({
     }
   };
 
-  // 캠페인 선택 시 참여자 데이터 API로 로드
+  const { pollJobStatus, loading: scrapeJobLoading } = usePollScrapeJob({ campaignId: campaign.id });
+
+
+  const handleCreateCampaignData = async () => {
+    setCreateCampaignDataLoading(true);
+    try {
+      const { jobId } = await fetch('http://3.25.179.50:3001/api/scrape/mension', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: campaign.mentionName ?? 'allseasons_protein_lab',
+        }),
+      }).then((res) => res.json());
+
+      await pollJobStatus(jobId);
+    } catch (error) {
+      console.error('[CampaignDetail] 캠페인 데이터 생성 실패:', error);
+    } finally {
+      setCreateCampaignDataLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadParticipants();
   }, [campaign.id]);
@@ -1458,19 +1486,31 @@ function CampaignDetailView({
             </button>
           ))}
         </div>
-        <button
-          onClick={handleSyncCampaign}
-          disabled={syncing}
-          className="flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white text-sm font-medium rounded-lg transition-colors mr-1"
-          title="캠페인 데이터 동기화"
-        >
-          {syncing ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <RefreshCw size={14} />
-          )}
-          {syncing ? '동기화 중...' : '동기화'}
-        </button>
+        <div className='flex items-center gap-2'>
+
+          <button
+            onClick={handleCreateCampaignData}
+            disabled={createCampaignDataLoading || scrapeJobLoading}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white text-sm font-medium rounded-lg transition-colors"
+            title="캠페인 데이터 생성"
+          >
+            {(createCampaignDataLoading || scrapeJobLoading) ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {(createCampaignDataLoading || scrapeJobLoading) ? "캠페인 데이터 생성 중..." : '캠페인 데이터 생성'} 
+          </button>
+          <button
+            onClick={handleSyncCampaign}
+            disabled={syncing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white text-sm font-medium rounded-lg transition-colors mr-1"
+            title="캠페인 데이터 동기화"
+          >
+            {syncing ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            {syncing ? '동기화 중...' : '동기화'}
+          </button>
+        </div>
       </div>
 
       {/* Sub Tab Content */}
