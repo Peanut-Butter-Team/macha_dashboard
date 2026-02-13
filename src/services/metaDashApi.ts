@@ -240,12 +240,13 @@ export interface FetchInfluencersParams {
   followerMax?: number;
   activityWithin?: number;
   engagementMin?: number;
+  sort?: string;
 }
 
 export async function fetchDashInfluencersWithDetail(
   params: FetchInfluencersParams = {}
 ): Promise<PageResponse<DashInfluencerWithDetail>> {
-  const { page = 0, size = 15, keyword, category, followerMin, followerMax, activityWithin, engagementMin } = params;
+  const { page = 0, size = 15, keyword, category, followerMin, followerMax, activityWithin, engagementMin, sort } = params;
 
   const queryParams = new URLSearchParams();
   queryParams.append('page', String(page));
@@ -256,6 +257,7 @@ export async function fetchDashInfluencersWithDetail(
   if (followerMax !== undefined) queryParams.append('followerMax', String(followerMax));
   if (activityWithin !== undefined) queryParams.append('activityWithin', String(activityWithin));
   if (engagementMin !== undefined) queryParams.append('engagementMin', String(engagementMin));
+  if (sort) queryParams.append('sort', sort);
 
   const response = await fetchMetaDash<MetaDashResponse<PageResponse<DashInfluencerWithDetail>[]>>(
     `/api/v1/dash-influencers/list-with-detail?${queryParams.toString()}`
@@ -270,18 +272,6 @@ export async function fetchDashInfluencersWithDetail(
     last: true,
     empty: true
   };
-}
-
-// 10-1. 인플루언서 전체 필터 결과 로드 (클라이언트 정렬/페이징용)
-export async function fetchAllDashInfluencersWithDetail(
-  params: Omit<FetchInfluencersParams, 'page' | 'size'> = {}
-): Promise<DashInfluencerWithDetail[]> {
-  const result = await fetchDashInfluencersWithDetail({
-    ...params,
-    page: 1,
-    size: 1000,
-  });
-  return result.content;
 }
 
 // 11. 광고 캠페인 목록 조회
