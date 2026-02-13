@@ -1644,6 +1644,7 @@ function convertNotionCampaign(campaign: NotionCampaign): CampaignListItem {
     endDate: campaign.endDate,
     manager: campaign.manager,
     status: campaign.status, // Notion에서 한국어 상태값 ('진행중', '완료' 등)이 직접 옴
+    mentionName: campaign.mentionName
   };
 }
 
@@ -1658,7 +1659,7 @@ export function CampaignTab({
   const { user } = useAuth();
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignListItem | null>(null);
   const [selectedCampaignResults, setSelectedCampaignResults] = useState<CampaignResultDto[]>([]);
-  const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
+    const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
   const [campaignResultsMap, setCampaignResultsMap] = useState<Map<string, CampaignResultDto[]>>(new Map());
   const [pagination, setPagination] = useState({
     page: 1,

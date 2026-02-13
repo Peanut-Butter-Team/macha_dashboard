@@ -25,6 +25,7 @@ export interface CampaignDto {
   endDate: string;
   manager: string;
   status: string;
+  mentionName: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +43,7 @@ export interface NotionCampaign {
   status: string;
   budget: number;
   spent: number;
+  mentionName: string;
 }
 
 // 캠페인 결과 데이터 타입 (Instagram 포스트 데이터)
@@ -168,7 +170,8 @@ export async function fetchCampaigns(dashMemberId: string): Promise<NotionCampai
     manager: campaign.manager,
     status: campaign.status,
     budget: 0,
-    spent: 0,
+    spent: 0, 
+    mentionName: campaign.mentionName
   }));
 }
 
@@ -301,6 +304,7 @@ export function convertCampaignWithDetailToNotionCampaign(item: CampaignWithDeta
     status: campaign.status,
     budget: 0,
     spent: 0,
+    mentionName: campaign.mentionName
   };
 }
 
