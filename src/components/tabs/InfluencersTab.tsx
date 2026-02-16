@@ -883,7 +883,6 @@ export function InfluencersTab() {
 
   // 정렬 핸들러
   const handleSort = (field: SortField) => {
-    if (isRefetching) return;
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -981,6 +980,8 @@ export function InfluencersTab() {
 
   // 데이터 로드: 서버 사이드 페이징/정렬
   useEffect(() => {
+    const abortController = new AbortController();
+
     const loadPageData = async () => {
       try {
         if (!initialLoading) {
@@ -1003,19 +1004,27 @@ export function InfluencersTab() {
           sort: buildSortParam(sortField, sortDirection),
         });
 
+        if (abortController.signal.aborted) return;
+
         setPageData(result.content);
         setTotalElements(result.totalElements);
         setTotalPages(result.totalPages);
       } catch (err) {
+        if (abortController.signal.aborted) return;
         console.error('[InfluencersTab] 페이지 데이터 로드 실패:', err);
-        setError(err instanceof Error ? err.message : '알 수 없는 오류');
+        if (initialLoading) {
+          setError(err instanceof Error ? err.message : '알 수 없는 오류');
+        }
       } finally {
-        setInitialLoading(false);
-        setIsRefetching(false);
+        if (!abortController.signal.aborted) {
+          setInitialLoading(false);
+          setIsRefetching(false);
+        }
       }
     };
 
     loadPageData();
+    return () => abortController.abort();
   }, [
     currentPage,
     sortField,
