@@ -805,7 +805,8 @@ export function InfluencersTab() {
   const [pageData, setPageData] = useState<DashInfluencerWithDetail[]>([]);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 임시 필터 상태 (UI에 바인딩)
@@ -882,6 +883,7 @@ export function InfluencersTab() {
 
   // 정렬 핸들러
   const handleSort = (field: SortField) => {
+    if (isRefetching) return;
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -893,10 +895,6 @@ export function InfluencersTab() {
 
   // 검색 핸들러 - 임시 필터를 적용 상태로 복사
   const handleSearch = () => {
-    // 로딩 상태로 전환
-    setPageData([]);
-    setLoading(true);
-
     setAppliedFilters({
       search: tempSearchQuery,
       category: tempCategoryFilter,
@@ -909,10 +907,6 @@ export function InfluencersTab() {
 
   // 초기화 핸들러 - 임시 상태와 적용 상태 모두 초기화
   const handleReset = () => {
-    // 로딩 상태로 전환
-    setPageData([]);
-    setLoading(true);
-
     setTempSearchQuery('');
     setTempCategoryFilter('all');
     setTempFollowerFilter('all');
@@ -976,11 +970,11 @@ export function InfluencersTab() {
   const buildSortParam = (field: SortField | null, direction: SortDirection): string | undefined => {
     if (!field) return undefined;
     const fieldMap: Record<SortField, string> = {
-      followerCount: 'followerCount',
-      postsCount: 'postsCount',
-      avgLikes: 'avgLikes',
-      avgComments: 'avgComments',
-      engagementRate: 'engagementRate',
+      followerCount: 'FOLLOWER',
+      postsCount: 'POST_COUNT',
+      avgLikes: 'AVG_LIKE',
+      avgComments: 'AVG_COMMENT',
+      engagementRate: 'ENGAGEMENT',
     };
     return `${fieldMap[field]},${direction}`;
   };
@@ -989,7 +983,9 @@ export function InfluencersTab() {
   useEffect(() => {
     const loadPageData = async () => {
       try {
-        setLoading(true);
+        if (!initialLoading) {
+          setIsRefetching(true);
+        }
         setError(null);
 
         const followerRange = getFollowerRange(appliedFilters.follower);
@@ -1014,7 +1010,8 @@ export function InfluencersTab() {
         console.error('[InfluencersTab] 페이지 데이터 로드 실패:', err);
         setError(err instanceof Error ? err.message : '알 수 없는 오류');
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
+        setIsRefetching(false);
       }
     };
 
@@ -1036,7 +1033,7 @@ export function InfluencersTab() {
   // 카테고리 목록 (하드코딩 - getActivityFieldColor 키 기반)
   const allCategories = ['헬스', '러닝', '요가', '필라테스', '바레', '크로스핏', '하이록스', 'F45', '헬스/웨이트', '기타'];
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-12 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin mr-3 text-orange-500" />
@@ -1161,7 +1158,12 @@ export function InfluencersTab() {
       </div>
 
       {/* 테이블 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative">
+        {isRefetching && (
+          <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+          </div>
+        )}
         {paginatedInfluencers.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
