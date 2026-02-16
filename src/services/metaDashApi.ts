@@ -257,10 +257,11 @@ export async function fetchDashInfluencersWithDetail(
   if (followerMax !== undefined) queryParams.append('followerMax', String(followerMax));
   if (activityWithin !== undefined) queryParams.append('activityWithin', String(activityWithin));
   if (engagementMin !== undefined) queryParams.append('engagementMin', String(engagementMin));
-  if (sort) queryParams.append('sort', sort);
+  // sort는 URLSearchParams에 넣지 않음 (콤마 %2C 인코딩 방지)
+  const sortParam = sort ? `&sort=${sort}` : '';
 
   const response = await fetchMetaDash<MetaDashResponse<PageResponse<DashInfluencerWithDetail>[]>>(
-    `/api/v1/dash-influencers/list-with-detail?${queryParams.toString()}`
+    `/api/v1/dash-influencers/list-with-detail?${queryParams.toString()}${sortParam}`
   );
   return response.result?.[0] || {
     content: [],
