@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Search, ChevronUp, ChevronDown, Heart, ExternalLink, Users, UserPlus, X, Instagram, MessageCircle, Calendar, Play, Eye, RefreshCw, Loader2, Link2, Pencil } from 'lucide-react';
 import type { DashInfluencerWithDetail, DashInfluencerPost, DashInfluencer, DashInfluencerDetail, DashCampaignInfluencerParticipate } from '../../types/metaDash';
 import type { SeedingItem, Influencer } from '../../types';
-import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramProfileImageUrl, getInstagramPostImageUrl } from '../../utils/imageProxy';
+import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramProfileImageUrl, getInstagramPostImageUrl, isS3Path } from '../../utils/imageProxy';
 import { formatNumber as formatNumberBase, formatPercent } from '../../utils/formatters';
 import { updateDashInfluencer, fetchDashInfluencerDetail } from '../../services/metaDashApi';
 
@@ -195,6 +195,11 @@ function InstagramPostImage({
   }, [originalUrl, shortCode]);
 
   const handleImageError = async () => {
+    // S3/CloudFront 이미지는 Instagram API fallback 불필요
+    if (isS3Path(originalUrl)) {
+      setHasFailed(true);
+      return;
+    }
     // 이미지 로드 실패 시 API fallback 시도
     if (!hasFailed && shortCode) {
       try {

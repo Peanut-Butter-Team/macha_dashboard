@@ -27,7 +27,7 @@ import {
   Users,
   Play,
 } from 'lucide-react';
-import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramPostImageUrl } from '../../utils/imageProxy';
+import { getProxiedImageUrl, isInstagramCdnUrl, getInstagramPostImageUrl, isS3Path } from '../../utils/imageProxy';
 import { InfoTooltip } from '../common/InfoTooltip';
 import { AIAnalysisCard } from '../common/AIAnalysisCard';
 import { formatNumber, formatDateTime, formatPercent } from '../../utils/formatters';
@@ -166,6 +166,11 @@ function InstagramPostImage({
   }, [originalUrl, shortCode]);
 
   const handleImageError = async () => {
+    // S3/CloudFront 이미지는 Instagram API fallback 불필요
+    if (isS3Path(originalUrl)) {
+      setHasFailed(true);
+      return;
+    }
     // 이미지 로드 실패 시 API fallback 시도
     if (!hasFailed && shortCode) {
       try {

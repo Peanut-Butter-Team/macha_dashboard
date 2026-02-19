@@ -30,6 +30,14 @@ export function getProxiedImageUrl(url: string | null | undefined): string {
 }
 
 /**
+ * S3/CloudFront 상대 경로인지 확인
+ */
+export function isS3Path(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith('/matcha/') || url.startsWith('matcha/');
+}
+
+/**
  * Instagram CDN URL인지 확인
  */
 export function isInstagramCdnUrl(url: string | null | undefined): boolean {
