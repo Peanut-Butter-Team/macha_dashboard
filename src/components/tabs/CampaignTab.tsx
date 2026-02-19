@@ -141,8 +141,13 @@ function InstagramPostImage({
 
       // 2. CDN 만료된 경우 → API로 새 URL 가져오기
       if (shortCode && isInstagramCdnUrl(originalUrl)) {
+        const apiUrl = getInstagramPostImageUrl(shortCode);
+        if (!apiUrl) {
+          setHasFailed(true);
+          setIsLoading(false);
+          return;
+        }
         try {
-          const apiUrl = getInstagramPostImageUrl(shortCode);
           const response = await fetch(apiUrl);
           if (response.ok) {
             const data = await response.json();
@@ -173,8 +178,12 @@ function InstagramPostImage({
     }
     // 이미지 로드 실패 시 API fallback 시도
     if (!hasFailed && shortCode) {
+      const apiUrl = getInstagramPostImageUrl(shortCode);
+      if (!apiUrl) {
+        setHasFailed(true);
+        return;
+      }
       try {
-        const apiUrl = getInstagramPostImageUrl(shortCode);
         const response = await fetch(apiUrl);
         if (response.ok) {
           const data = await response.json();
@@ -1120,7 +1129,7 @@ function extractSeedingFromResults(results: CampaignResultDto[]): SeedingItem[] 
       name: result.ownerFullName || result.ownerUsername,
       handle: result.ownerUsername,
       platform: 'instagram' as const,
-      thumbnail: result.ownerProfilePicUrl || '',
+      thumbnail: getProxiedImageUrl(result.ownerProfilePicUrl) || '',
       followers: 0,
       engagementRate: 0,
       avgLikes: 0,
@@ -1154,18 +1163,15 @@ function convertCampaignResultToContent(result: CampaignResultDto): ContentItem 
   const totalEngagement = (result.likesCount || 0) + (result.commentsCount || 0) + (result.reshareCount || 0);
   const engagementRate = totalViews > 0 ? (totalEngagement / totalViews) * 100 : 0;
 
-  // 디버깅: 실제 URL 형식 확인 (검증 후 제거)
-  console.log('[CampaignResult] displayUrl:', result.displayUrl?.substring(0, 100));
-
   return {
     id: result.id,
     influencerId: result.ownerId,
     influencerName: result.ownerFullName || result.ownerUsername,
     platform: 'instagram',
     type: getContentType(result.postType),
-    thumbnail: result.displayUrl || 'https://placehold.co/300x400',
+    thumbnail: getProxiedImageUrl(result.displayUrl) || 'https://placehold.co/300x400',
     originalUrl: result.postUrl,
-    downloadUrl: result.videoUrl || result.displayUrl,
+    downloadUrl: getProxiedImageUrl(result.videoUrl || result.displayUrl),
     likes: result.likesCount || 0,
     comments: result.commentsCount || 0,
     shares: result.reshareCount || 0,

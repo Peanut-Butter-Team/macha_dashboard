@@ -65,8 +65,13 @@ function InstagramProfileImage({
 
       // 2. CDN 만료된 경우 → API로 새 URL 가져오기
       if (username && isInstagramCdnUrl(originalUrl)) {
+        const apiUrl = getInstagramProfileImageUrl(username);
+        if (!apiUrl) {
+          setHasFailed(true);
+          setIsLoading(false);
+          return;
+        }
         try {
-          const apiUrl = getInstagramProfileImageUrl(username);
           const response = await fetch(apiUrl);
           if (response.ok) {
             const data = await response.json();
@@ -92,8 +97,12 @@ function InstagramProfileImage({
   const handleImageError = async () => {
     // 이미지 로드 실패 시 API fallback 시도
     if (!hasFailed && username) {
+      const apiUrl = getInstagramProfileImageUrl(username);
+      if (!apiUrl) {
+        setHasFailed(true);
+        return;
+      }
       try {
-        const apiUrl = getInstagramProfileImageUrl(username);
         const response = await fetch(apiUrl);
         if (response.ok) {
           const data = await response.json();
@@ -170,8 +179,13 @@ function InstagramPostImage({
 
       // 2. CDN 만료된 경우 → API로 새 URL 가져오기
       if (shortCode && isInstagramCdnUrl(originalUrl)) {
+        const apiUrl = getInstagramPostImageUrl(shortCode);
+        if (!apiUrl) {
+          setHasFailed(true);
+          setIsLoading(false);
+          return;
+        }
         try {
-          const apiUrl = getInstagramPostImageUrl(shortCode);
           const response = await fetch(apiUrl);
           if (response.ok) {
             const data = await response.json();
@@ -202,8 +216,12 @@ function InstagramPostImage({
     }
     // 이미지 로드 실패 시 API fallback 시도
     if (!hasFailed && shortCode) {
+      const apiUrl = getInstagramPostImageUrl(shortCode);
+      if (!apiUrl) {
+        setHasFailed(true);
+        return;
+      }
       try {
-        const apiUrl = getInstagramPostImageUrl(shortCode);
         const response = await fetch(apiUrl);
         if (response.ok) {
           const data = await response.json();

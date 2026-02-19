@@ -73,7 +73,7 @@ export function isInstagramCdnUrl(url: string | null | undefined): boolean {
  * @param username - Instagram 사용자명
  */
 export function getInstagramProfileImageUrl(username: string | null | undefined): string {
-  if (!username) return '';
+  if (!username || import.meta.env.PROD) return '';
   return `${API_BASE}/api/instagram-profile?username=${encodeURIComponent(username.trim())}`;
 }
 
@@ -82,6 +82,6 @@ export function getInstagramProfileImageUrl(username: string | null | undefined)
  * @param shortCode - Instagram 게시물 shortCode
  */
 export function getInstagramPostImageUrl(shortCode: string | null | undefined): string {
-  if (!shortCode) return '';
+  if (!shortCode || import.meta.env.PROD) return '';
   return `${API_BASE}/api/instagram-post?shortCode=${encodeURIComponent(shortCode.trim())}`;
 }
