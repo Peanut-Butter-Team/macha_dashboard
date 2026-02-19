@@ -1154,6 +1154,9 @@ function convertCampaignResultToContent(result: CampaignResultDto): ContentItem 
   const totalEngagement = (result.likesCount || 0) + (result.commentsCount || 0) + (result.reshareCount || 0);
   const engagementRate = totalViews > 0 ? (totalEngagement / totalViews) * 100 : 0;
 
+  // 디버깅: 실제 URL 형식 확인 (검증 후 제거)
+  console.log('[CampaignResult] displayUrl:', result.displayUrl?.substring(0, 100));
+
   return {
     id: result.id,
     influencerId: result.ownerId,
