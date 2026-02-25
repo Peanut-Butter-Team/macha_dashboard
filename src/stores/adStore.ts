@@ -77,11 +77,11 @@ async function fetchAllAdDataBatch(
   campaignList: DashAdListItem[];
   campaignDetails: DashAdCampaignDetailItem[];
 }> {
-  // 오늘 기준 2일치 데이터 조회
+  // 오늘 기준 3일치 데이터 조회
   const today = new Date();
-  const twoDaysAgo = new Date(today);
-  twoDaysAgo.setDate(today.getDate() - 1);
-  const startDate = twoDaysAgo.toISOString().split('T')[0];
+  const threeDaysAgo = new Date(today);
+  threeDaysAgo.setDate(today.getDate() - 2);
+  const startDate = threeDaysAgo.toISOString().split('T')[0];
   const endDate = new Date().toISOString().split('T')[0];
   const accountsWithInsights = await fetchDashAdInsight(userId, startDate, endDate);
 

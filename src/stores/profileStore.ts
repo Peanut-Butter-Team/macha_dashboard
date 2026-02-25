@@ -98,11 +98,11 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     set({ loading: true, error: null, currentUserId: userId });
 
     try {
-      // 오늘 기준 2일치 데이터 조회
+      // 오늘 기준 3일치 데이터 조회
       const today = new Date();
-      const twoDaysAgo = new Date(today);
-      twoDaysAgo.setDate(today.getDate() - 1);
-      const startDate = twoDaysAgo.toISOString().split('T')[0];
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(today.getDate() - 2);
+      const startDate = threeDaysAgo.toISOString().split('T')[0];
       const endDate = new Date().toISOString().split('T')[0];
 
       // 4개 API를 캐싱과 함께 병렬 호출 (중복 방지됨)
@@ -184,11 +184,11 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      // 오늘 기준 2일치 데이터 조회
+      // 오늘 기준 3일치 데이터 조회
       const today = new Date();
-      const twoDaysAgo = new Date(today);
-      twoDaysAgo.setDate(today.getDate() - 1);
-      const startDate = twoDaysAgo.toISOString().split('T')[0];
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(today.getDate() - 2);
+      const startDate = threeDaysAgo.toISOString().split('T')[0];
       const endDate = new Date().toISOString().split('T')[0];
 
       // 캐시를 무시하고 강제로 새로 가져옴
