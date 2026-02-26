@@ -14,7 +14,6 @@ import type {
 import {
   fetchDashAdStatisticsSummary,
   fetchDashAdDetailInfo,
-  fetchDashAdInsight,
 } from '../services/metaDashApi';
 import {
   mapToAdPerformanceFromCampaignDetail,
@@ -23,7 +22,6 @@ import {
   mapToCampaignHierarchyFromCampaignDetail,
   mapToCampaignDailyData,
   convertStatisticsToCampaignDetail,
-  convertInsightsToCampaignDetail,
 } from '../utils/metaDashMapper';
 import {
   cachedSessionFetch,
@@ -70,36 +68,6 @@ interface AdState {
 /** sessionStorage 캐시 TTL: 30분 */
 const SESSION_CACHE_TTL = 30 * 60 * 1000;
 
-/**
- * 기존 my-insight API로 폴백
- * summary-all이 빈 데이터일 때 사용
- * my-insight 데이터를 convertInsightsToCampaignDetail로 변환하여
- * 기존 매퍼와 호환되는 형태로 반환
- */
-async function fetchLegacyAdData(
-  userId: string,
-  today: string
-): Promise<{
-  campaignList: DashAdListItem[];
-  campaignDetails: DashAdCampaignDetailItem[];
-}> {
-  // 오늘 기준 3일치 조회
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 3);
-  const time = startDate.toISOString().split('T')[0];
-
-  const adInsights = await cachedSessionFetch(
-    `legacy_insight_${userId}_${today}`,
-    () => fetchDashAdInsight(userId, time, today),
-    SESSION_CACHE_TTL
-  );
-
-  // my-insight 데이터를 DashAdCampaignDetailItem[]로 변환
-  const campaignDetails = convertInsightsToCampaignDetail(adInsights);
-
-  return { campaignList: [], campaignDetails };
-}
-
 async function fetchAllAdDataBatch(
   userId: string
 ): Promise<{
@@ -119,36 +87,29 @@ async function fetchAllAdDataBatch(
     SESSION_CACHE_TTL
   );
 
-  // 신규 API에 데이터가 있으면 신규 플로우 사용
-  if (statistics && statistics.length > 0) {
-    // 2. 응답에서 모든 adId 추출 (중복 제거)
-    const adIdSet = new Set<string>();
-    for (const campaign of statistics) {
-      for (const adSetResp of (campaign.dashAdSetResponses || [])) {
-        for (const insight of (adSetResp.responses || [])) {
-          if (insight.adId) adIdSet.add(insight.adId);
-        }
+  // 2. 응답에서 모든 adId 추출 (중복 제거)
+  const adIdSet = new Set<string>();
+  for (const campaign of (statistics || [])) {
+    for (const adSetResp of (campaign.dashAdSetResponses || [])) {
+      for (const insight of (adSetResp.responses || [])) {
+        if (insight.adId) adIdSet.add(insight.adId);
       }
     }
-    const adIds = Array.from(adIdSet);
-
-    // 3. 광고별 상세 조회 (sessionStorage 캐싱)
-    const adDetails = adIds.length > 0
-      ? await cachedSessionFetch(
-          `detail_${userId}_${today}`,
-          () => fetchDashAdDetailInfo(adIds, today),
-          SESSION_CACHE_TTL
-        )
-      : [];
-
-    // 4. 어댑터로 기존 매퍼가 기대하는 형태로 변환
-    const campaignDetails = convertStatisticsToCampaignDetail(statistics, adDetails);
-    return { campaignList: [], campaignDetails };
   }
+  const adIds = Array.from(adIdSet);
 
-  // 신규 API 데이터 없음 → 기존 API 폴백
-  console.log('[AdStore] summary-all 데이터 없음, 기존 API로 폴백');
-  return fetchLegacyAdData(userId, today);
+  // 3. 광고별 상세 조회 (sessionStorage 캐싱)
+  const adDetails = adIds.length > 0
+    ? await cachedSessionFetch(
+        `detail_${userId}_${today}`,
+        () => fetchDashAdDetailInfo(adIds, today),
+        SESSION_CACHE_TTL
+      )
+    : [];
+
+  // 4. 어댑터로 기존 매퍼가 기대하는 형태로 변환
+  const campaignDetails = convertStatisticsToCampaignDetail(statistics || [], adDetails);
+  return { campaignList: [], campaignDetails };
 }
 
 /**
