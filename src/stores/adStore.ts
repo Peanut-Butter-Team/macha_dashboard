@@ -71,9 +71,9 @@ async function fetchAllAdDataBatch(
   yesterday.setDate(yesterday.getDate() - 1);
   const endTime = yesterday.toISOString().split('T')[0];
 
-  // 오늘 기준 3일 전 (기존 my-insight와 동일 범위)
+  // 오늘 기준 30일 전 (한달치 데이터)
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 3);
+  startDate.setDate(startDate.getDate() - 30);
   const time = startDate.toISOString().split('T')[0];
 
   // 1. 통계 전체 조회
