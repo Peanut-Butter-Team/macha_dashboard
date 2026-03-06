@@ -400,10 +400,23 @@ export interface DashAdStatisticsInsight {
 // 상세 API 응답 (/api/v1/dash-ad/detail/ad-detail)
 export interface DashAdDetailInfo {
   adId: string;
-  thumbnailUrl: string;
-  name: string;
+  adName: string;
   status: string;
-  message: string;
+  effectiveStatus?: string;
+  campaignId?: string;
+  adsetId?: string;
+  creativeId?: string;
+  creativeName?: string;
+  thumbnailUrl: string;
+  pageId?: string;
+  instagramUserId?: string;
+  videoId?: string | null;
+  title?: string | null;
+  message?: string | null;
+  imageUrl?: string;
+  imageHash?: string;
+  callToActionType?: string;
+  callToActionLink?: string;
 }
 
 // ============================================

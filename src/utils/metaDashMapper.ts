@@ -1845,7 +1845,7 @@ export function convertStatisticsToCampaignDetail(
           dashMemberId: insight.dashMemberId || '',
           time: insight.time,
           adId: insight.adId,
-          adName: adDetail?.name || `광고 ${insight.adId.slice(-6)}`,
+          adName: adDetail?.adName || `광고 ${insight.adId.slice(-6)}`,
           status: adDetail?.status || 'ACTIVE',
           effectiveStatus: adDetail?.status || 'ACTIVE',
           campaignId: campaign.campaignId,
